@@ -4,6 +4,7 @@ const { requireAuth, requireRole, requireMinRole } = require('../middleware/auth
 const { recordAudit } = require('../utils/audit');
 const { recordHistory } = require('../utils/history');
 const { sendReportSubmittedEmail } = require('../utils/email');
+const { renderTablePdf } = require('../utils/pdfTable');
 
 const router = express.Router();
 
@@ -182,9 +183,20 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
   });
 }
 
-// GET /api/reports - list with filters
-router.get('/', requireAuth, async (req, res) => {
-  const { date, dateFrom, dateTo, shiftId, supervisorId, driverId, shuttleId, status, hasCallouts, hasShiftCoverage } = req.query;
+function describeReportFilters(query) {
+  const parts = [];
+  if (query.date) parts.push(`Date: ${query.date}`);
+  if (query.dateFrom || query.dateTo) parts.push(`Date: ${query.dateFrom || '…'} to ${query.dateTo || '…'}`);
+  if (query.status) parts.push(`Status: ${query.status}`);
+  if (query.shiftId) parts.push(`Shift filter applied`);
+  if (query.supervisorId) parts.push(`Supervisor filter applied`);
+  if (query.driverId) parts.push(`Driver filter applied`);
+  if (query.shuttleId) parts.push(`Shuttle filter applied`);
+  return parts.length ? parts.join(' · ') : 'All reports';
+}
+
+function buildReportListFilter(query) {
+  const { date, dateFrom, dateTo, shiftId, supervisorId, driverId, shuttleId, status, hasCallouts, hasShiftCoverage } = query;
   const where = [];
   const params = [];
 
@@ -205,18 +217,64 @@ router.get('/', requireAuth, async (req, res) => {
   if (hasCallouts === '1') { where.push('EXISTS (SELECT 1 FROM driver_callouts c WHERE c.report_id = dr.id)'); }
   if (hasShiftCoverage === '1') { where.push('EXISTS (SELECT 1 FROM shift_coverage sc WHERE sc.report_id = dr.id)'); }
 
-  const sql = `
-    SELECT dr.id, dr.report_date, dr.status, dr.created_at, dr.updated_at,
-           s.name AS shift_name, u.id AS supervisor_id, u.name AS supervisor_name
-    FROM daily_reports dr
-    JOIN shifts s ON s.id = dr.shift_id
-    JOIN users u ON u.id = dr.supervisor_id
-    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY dr.report_date DESC, dr.created_at DESC
-    LIMIT 500`;
+  return { where: where.length ? 'WHERE ' + where.join(' AND ') : '', params };
+}
 
-  const [rows] = await pool.query(sql, params);
+async function queryReportList(query) {
+  const { where, params } = buildReportListFilter(query);
+  const [rows] = await pool.query(
+    `SELECT dr.id, dr.report_date, dr.status, dr.created_at, dr.updated_at,
+            s.name AS shift_name, u.id AS supervisor_id, u.name AS supervisor_name
+     FROM daily_reports dr
+     JOIN shifts s ON s.id = dr.shift_id
+     JOIN users u ON u.id = dr.supervisor_id
+     ${where}
+     ORDER BY dr.report_date DESC, dr.created_at DESC
+     LIMIT 500`,
+    params
+  );
+  return rows;
+}
+
+// GET /api/reports - list with filters
+router.get('/', requireAuth, async (req, res) => {
+  const rows = await queryReportList(req.query);
   res.json({ reports: rows });
+});
+
+// GET /api/reports/export.csv - the current (filtered) All Reports list.
+// Registered before /:id so "export.csv" is never treated as a report id.
+router.get('/export.csv', requireAuth, async (req, res) => {
+  const reportRows = await queryReportList(req.query);
+
+  const header = ['Report ID', 'Date', 'Shift', 'Supervisor', 'Status', 'Last Modified'];
+  const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [header.join(',')];
+  for (const r of reportRows) {
+    lines.push([r.id, r.report_date, r.shift_name, r.supervisor_name, r.status, r.updated_at].map(csvEscape).join(','));
+  }
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="daily-reports-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send(lines.join('\n'));
+});
+
+// GET /api/reports/export.pdf - same list, as a printable PDF.
+router.get('/export.pdf', requireAuth, async (req, res) => {
+  const reportRows = await queryReportList(req.query);
+  renderTablePdf(res, {
+    filename: `daily-reports-${new Date().toISOString().slice(0, 10)}.pdf`,
+    title: 'Employee Parking Daily Reports',
+    subtitle: describeReportFilters(req.query),
+    columns: [
+      { key: 'report_date', label: 'Date' },
+      { key: 'shift_name', label: 'Shift' },
+      { key: 'supervisor_name', label: 'Supervisor' },
+      { key: 'status', label: 'Status' },
+      { key: 'updated_at', label: 'Last Modified' },
+    ],
+    rows: reportRows,
+  });
 });
 
 // GET /api/reports/:id

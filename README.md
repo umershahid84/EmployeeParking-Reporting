@@ -178,9 +178,29 @@ time the dashboard is loaded or a filter changes.
   each row linking to the underlying report.
 - **Drill-down** — clicking a trend point or a comparison bar navigates to
   **All Reports** pre-filtered to that date/supervisor/shift/shuttle/driver.
-- **Export** — the Export CSV button downloads one row per report (matching
-  the current filters) with each metric's count. Excel/PDF export are not
-  implemented yet — CSV covers the same filtered data in the meantime.
+
+## Export & Print
+
+Both **All Reports** and **Analytics & Trends** have **Export CSV**,
+**Export PDF**, and **Print** buttons that respect whatever filters are
+currently applied.
+
+- **Export CSV** — `GET /api/reports/export.csv` (report list) and
+  `GET /api/analytics/export.csv` (per-report metric counts) stream a CSV
+  built from the same filtered query as the on-screen data.
+- **Export PDF** — `GET /api/reports/export.pdf` renders the filtered report
+  list as a paginated table; `GET /api/analytics/export.pdf` renders the
+  overview totals plus the by-shift/by-supervisor/by-location/incoming-
+  supervisor breakdowns as a summary document. Both are generated
+  server-side with `pdfkit` (no headless browser dependency).
+- **Print** — a plain `window.print()` using a print stylesheet that hides
+  navigation, filter controls, and action buttons, leaving just the table
+  (Reports) or the stat tiles/charts/tables (Analytics).
+
+All three actions honor the exact filters selected at the time — e.g. Date:
+August 1–22, Shift: Graveyard, Supervisor: Supervisor A produces an export
+containing only that data. Excel export is not implemented — CSV opens
+directly in Excel and covers the same filtered data in the meantime.
 
 ## Password reset
 
@@ -222,7 +242,7 @@ with incoming supervisors/call-outs/shift coverage/work orders, edit
 history, manager comments, admin management of users/drivers/shuttles/email
 recipients, audit logging, password reset, account setup and report
 submission email notifications, and a live Analytics/Trends dashboard with
-filtering, drill-down, and CSV export). The architecture is modular
-(separate route/table per concern) so future sections — equipment/vehicle
-inspections, incident reporting, Excel/PDF export, scheduled email digests,
-etc. — can be added without restructuring what's here.
+filtering, drill-down, and CSV/PDF export/print). The architecture is
+modular (separate route/table per concern) so future sections —
+equipment/vehicle inspections, incident reporting, Excel export, scheduled
+email digests, etc. — can be added without restructuring what's here.

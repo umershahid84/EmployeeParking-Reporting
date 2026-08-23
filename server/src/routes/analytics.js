@@ -1,6 +1,8 @@
 const express = require('express');
+const PDFDocument = require('pdfkit');
 const pool = require('../db/pool');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
+const { INK_PRIMARY, INK_SECONDARY, INK_MUTED, LINE } = require('../utils/pdfTable');
 
 const router = express.Router();
 
@@ -48,10 +50,10 @@ async function rows(sql, params) {
 
 // GET /api/analytics - one comprehensive, filter-driven payload so every
 // chart on the dashboard updates together from a single request.
-router.get('/', async (req, res) => {
-  const { where, params } = baseFilters(req.query);
-  const driverId = req.query.driverId ? Number(req.query.driverId) : null;
-  const shuttleId = req.query.shuttleId ? Number(req.query.shuttleId) : null;
+async function computeAnalytics(query) {
+  const { where, params } = baseFilters(query);
+  const driverId = query.driverId ? Number(query.driverId) : null;
+  const shuttleId = query.shuttleId ? Number(query.shuttleId) : null;
 
   const calloutDriverClause = driverId ? ' AND c.driver_id = ?' : '';
   const calloutShuttleClause = shuttleId ? ' AND c.shuttle_id = ?' : '';
@@ -169,7 +171,7 @@ router.get('/', async (req, res) => {
     ),
   ]);
 
-  res.json({
+  return {
     totals: {
       reports: totalReports,
       callouts: totalCallouts,
@@ -216,7 +218,14 @@ router.get('/', async (req, res) => {
     incomingSupervisors: incomingSupervisorTotals,
     driverMovementDetails,
     busIssueDetails,
-  });
+  };
+}
+
+// GET /api/analytics - one comprehensive, filter-driven payload so every
+// chart on the dashboard updates together from a single request.
+router.get('/', async (req, res) => {
+  const analytics = await computeAnalytics(req.query);
+  res.json(analytics);
 });
 
 // GET /api/analytics/export.csv - one row per matching report, with a count
@@ -249,6 +258,103 @@ router.get('/export.csv', async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="daily-report-analytics-${new Date().toISOString().slice(0, 10)}.csv"`);
   res.send(lines.join('\n'));
+});
+
+function describeAnalyticsFilters(query) {
+  const parts = [];
+  if (query.dateFrom || query.dateTo) parts.push(`Date: ${query.dateFrom || '…'} to ${query.dateTo || '…'}`);
+  if (query.shiftIds) parts.push('Shift filter applied');
+  if (query.supervisorIds) parts.push('Supervisor filter applied');
+  if (query.driverId) parts.push('Driver filter applied');
+  if (query.shuttleId) parts.push('Shuttle filter applied');
+  return parts.length ? parts.join(' · ') : 'All data';
+}
+
+// GET /api/analytics/export.pdf - a printable summary of the same
+// filter-driven analytics payload the dashboard renders.
+router.get('/export.pdf', async (req, res) => {
+  const analytics = await computeAnalytics(req.query);
+
+  const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="analytics-${new Date().toISOString().slice(0, 10)}.pdf"`);
+  doc.pipe(res);
+
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const bottom = doc.page.height - doc.page.margins.bottom;
+
+  function ensureSpace(height) {
+    if (doc.y + height > bottom) doc.addPage();
+  }
+
+  function heading(text) {
+    ensureSpace(30);
+    doc.moveDown(0.6);
+    doc.fontSize(13).fillColor(INK_PRIMARY).text(text);
+    doc.moveTo(left, doc.y + 2).lineTo(right, doc.y + 2).strokeColor(LINE).stroke();
+    doc.moveDown(0.4);
+  }
+
+  function miniTable(rows, labelKey = 'label', countKey = 'count', limit = 12) {
+    if (!rows.length) {
+      doc.fontSize(9).fillColor(INK_MUTED).text('No data for the selected filters.');
+      return;
+    }
+    for (const row of rows.slice(0, limit)) {
+      ensureSpace(14);
+      const y = doc.y;
+      doc.fontSize(9).fillColor(INK_PRIMARY).text(String(row[labelKey] ?? '—'), left, y, { width: 340, continued: false });
+      doc.fontSize(9).fillColor(INK_SECONDARY).text(String(row[countKey] ?? 0), left + 350, y, { width: 80, align: 'right' });
+      doc.y = y + 14;
+    }
+  }
+
+  doc.fontSize(18).fillColor(INK_PRIMARY).text('Employee Parking Analytics & Trends');
+  doc.moveDown(0.2);
+  doc.fontSize(9).fillColor(INK_SECONDARY).text(describeAnalyticsFilters(req.query));
+  doc.fontSize(8).fillColor(INK_MUTED).text(`Generated ${new Date().toLocaleString()}`);
+
+  heading('Overview');
+  const totals = analytics.totals;
+  doc.fontSize(10).fillColor(INK_PRIMARY);
+  [
+    ['Total Reports', totals.reports],
+    ['Driver Call-Outs', totals.callouts],
+    ['OT Coverage', totals.otCoverage],
+    ['Driver Movements', totals.driverMovements],
+    ['Uncovered Shifts', totals.uncoveredShifts],
+    ['Work Orders', totals.workOrders],
+  ].forEach(([label, value]) => {
+    ensureSpace(14);
+    const y = doc.y;
+    doc.fontSize(9).fillColor(INK_PRIMARY).text(label, left, y, { width: 200 });
+    doc.fontSize(9).fillColor(INK_SECONDARY).text(String(value), left + 200, y, { width: 80, align: 'right' });
+    doc.y = y + 14;
+  });
+
+  heading('Driver Call-Outs by Shift');
+  miniTable(analytics.byShift.callouts);
+
+  heading('Driver Call-Outs by Supervisor');
+  miniTable(analytics.bySupervisor.callouts);
+
+  heading('Shift Covered with OT - by Shift');
+  miniTable(analytics.byShift.ot);
+
+  heading('Moved from Another Shuttle - by Shift');
+  miniTable(analytics.byShift.moved);
+
+  heading('Shift Not Covered (Bus Issue) - by Shift');
+  miniTable(analytics.byShift.uncovered);
+
+  heading('Work Orders by Location');
+  miniTable(analytics.byLocation.workOrders);
+
+  heading('Incoming Supervisor Handoffs');
+  miniTable(analytics.incomingSupervisors);
+
+  doc.end();
 });
 
 module.exports = router;

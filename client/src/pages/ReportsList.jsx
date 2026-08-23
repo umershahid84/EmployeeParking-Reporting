@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { downloadFile } from '../utils/download';
 
 export default function ReportsList() {
   const { user } = useAuth();
@@ -25,10 +26,14 @@ export default function ReportsList() {
     api.get('/shifts').then(({ data }) => setShifts(data.shifts));
   }, []);
 
-  async function loadReports() {
+  function activeParams() {
     const params = {};
     Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-    const { data } = await api.get('/reports', { params });
+    return params;
+  }
+
+  async function loadReports() {
+    const { data } = await api.get('/reports', { params: activeParams() });
     setReports(data.reports);
   }
 
@@ -38,11 +43,26 @@ export default function ReportsList() {
     setFilters((f) => ({ ...f, [key]: value }));
   }
 
+  async function exportCsv() {
+    await downloadFile('/reports/export.csv', activeParams(), 'daily-reports.csv');
+  }
+
+  async function exportPdf() {
+    await downloadFile('/reports/export.pdf', activeParams(), 'daily-reports.pdf');
+  }
+
   return (
     <div className="page">
-      <h2>All Reports</h2>
+      <div className="page-header no-print">
+        <h2>All Reports</h2>
+        <div className="row-actions">
+          <button onClick={exportCsv}>Export CSV</button>
+          <button onClick={exportPdf}>Export PDF</button>
+          <button onClick={() => window.print()}>Print</button>
+        </div>
+      </div>
 
-      <form className="filter-bar" onSubmit={(e) => { e.preventDefault(); loadReports(); }}>
+      <form className="filter-bar no-print" onSubmit={(e) => { e.preventDefault(); loadReports(); }}>
         <label>Date <input type="date" value={filters.date} onChange={(e) => updateFilter('date', e.target.value)} /></label>
         <label>From <input type="date" value={filters.dateFrom} onChange={(e) => updateFilter('dateFrom', e.target.value)} /></label>
         <label>To <input type="date" value={filters.dateTo} onChange={(e) => updateFilter('dateTo', e.target.value)} /></label>
@@ -66,7 +86,7 @@ export default function ReportsList() {
 
       <table className="data-table">
         <thead>
-          <tr><th>Date</th><th>Shift</th><th>Supervisor</th><th>Last Modified</th><th>Status</th><th></th></tr>
+          <tr><th>Date</th><th>Shift</th><th>Supervisor</th><th>Last Modified</th><th>Status</th><th className="no-print"></th></tr>
         </thead>
         <tbody>
           {reports.map((r) => (
@@ -76,7 +96,7 @@ export default function ReportsList() {
               <td>{r.supervisor_name}</td>
               <td>{new Date(r.updated_at).toLocaleString()}</td>
               <td>{r.status}</td>
-              <td className="row-actions">
+              <td className="row-actions no-print">
                 <Link to={`/reports/${r.id}`}>View</Link>
                 {(user.role === 'administrator' || r.supervisor_id === user.id) && (
                   <Link to={`/reports/${r.id}/edit`}>Edit</Link>

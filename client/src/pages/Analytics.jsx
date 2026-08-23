@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import api from '../api/client';
 import { METRIC_COLORS, METRIC_LABELS, CHART_INK, LOCATION_COLORS } from '../charts/colors';
+import { downloadFile } from '../utils/download';
 
 const DATE_PRESETS = [
   { value: 'today', label: 'Today' },
@@ -144,26 +145,39 @@ export default function Analytics() {
     navigate(`/reports?${params.toString()}`);
   }
 
-  function exportCsv() {
-    const params = new URLSearchParams({
+  function analyticsExportParams() {
+    return {
       dateFrom: from || '',
       dateTo: to || '',
       shiftIds: shiftIds.join(','),
       supervisorIds: supervisorIds.join(','),
-    });
-    window.open(`/api/analytics/export.csv?${params.toString()}`, '_blank');
+      driverId: driverId || undefined,
+      shuttleId: shuttleId || undefined,
+    };
+  }
+
+  async function exportCsv() {
+    await downloadFile('/analytics/export.csv', analyticsExportParams(), 'analytics.csv');
+  }
+
+  async function exportPdf() {
+    await downloadFile('/analytics/export.pdf', analyticsExportParams(), 'analytics.pdf');
   }
 
   const shiftNames = shifts.map((s) => s.name);
 
   return (
     <div className="page">
-      <div className="page-header">
+      <div className="page-header no-print">
         <h2>Analytics &amp; Trends</h2>
-        <button onClick={exportCsv}>Export CSV</button>
+        <div className="row-actions">
+          <button onClick={exportCsv}>Export CSV</button>
+          <button onClick={exportPdf}>Export PDF</button>
+          <button onClick={() => window.print()}>Print</button>
+        </div>
       </div>
 
-      <section className="card filters-card">
+      <section className="card filters-card no-print">
         <div className="analytics-filter-row">
           <label>Date
             <select value={datePreset} onChange={(e) => setDatePreset(e.target.value)}>

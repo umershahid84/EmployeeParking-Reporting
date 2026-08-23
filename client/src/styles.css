@@ -154,3 +154,11 @@ legend { font-weight: 700; padding: 0 6px; }
 @media (max-width: 720px) {
   .app-header { flex-direction: column; align-items: flex-start; }
 }
+
+@media print {
+  .no-print { display: none !important; }
+  body, .app-main { background: white; }
+  .card { border: none; padding: 0; break-inside: avoid; }
+  .page { padding: 0; }
+  a[href]::after { content: none; }
+}

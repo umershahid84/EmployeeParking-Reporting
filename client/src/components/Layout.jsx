@@ -12,7 +12,7 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header no-print">
         <div className="brand">Employee Parking Daily Reporting</div>
         <nav>
           <Link to="/dashboard">Dashboard</Link>
