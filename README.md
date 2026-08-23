@@ -46,6 +46,15 @@ scripts directly.
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
+### Database name
+
+`DB_NAME` in `.env` sets the MariaDB database the app uses — it defaults to
+`epreport` in `.env.example`. `npm run migrate` creates this database
+automatically (via `CREATE DATABASE IF NOT EXISTS`) and applies the schema
+to it, so you don't need to create it by hand first; just make sure
+`DB_USER` has permission to create databases, or pre-create `epreport`
+yourself and grant that user access to it.
+
 ## Getting started (single application)
 
 ```bash
