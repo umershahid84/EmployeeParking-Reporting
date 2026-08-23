@@ -151,6 +151,15 @@ Set `SEND_EMAILS=false` to disable outbound mail entirely — every email is
 logged instead of sent (still recorded in `email_log` with status
 `skipped`), so no mail server is required for local development.
 
+**Troubleshooting `certificate has expired` / `ESOCKET`:** Nodemailer tries
+STARTTLS opportunistically whenever the mail relay advertises it, even with
+`EMAIL_SECURE=false` — so a relay with an expired or self-signed certificate
+(common for an internal-only relay) fails to connect. Set
+`EMAIL_IGNORE_TLS=true` in `.env` to skip TLS entirely (plaintext, fine for
+a trusted internal network), or `EMAIL_TLS_REJECT_UNAUTHORIZED=false` to
+keep opportunistic TLS but stop validating the certificate. Restart the app
+after changing either.
+
 ## Analytics & Trends dashboard
 
 Available to Managers and Administrators (`/analytics`, gated server-side by

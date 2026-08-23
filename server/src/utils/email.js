@@ -13,6 +13,12 @@ function getTransporter() {
     host: process.env.EMAIL_HOST,
     port: Number(process.env.EMAIL_PORT) || 25,
     secure: process.env.EMAIL_SECURE === 'true',
+    // Nodemailer attempts STARTTLS opportunistically whenever the server
+    // advertises it, even with secure=false - so an internal relay with an
+    // expired/self-signed cert will fail to connect unless TLS is either
+    // skipped entirely or told not to validate the certificate.
+    ignoreTLS: process.env.EMAIL_IGNORE_TLS === 'true',
+    tls: { rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false' },
     // The internal relay used in production accepts unauthenticated mail
     // from trusted hosts, so auth is only attached when a password is set.
     auth: process.env.EMAIL_PASSWORD
