@@ -1,9 +1,10 @@
 -- Employee Parking Daily Reporting Application
 -- MariaDB schema
-
-CREATE DATABASE IF NOT EXISTS employee_parking_reporting
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE employee_parking_reporting;
+--
+-- This file assumes the target database (DB_NAME) already exists and the
+-- connection is using it - scripts/migrate.js creates the database (named
+-- from the DB_NAME environment variable) and selects it before applying
+-- this file, so no CREATE DATABASE / USE statements are hardcoded here.
 
 -- ---------------------------------------------------------------------------
 -- Roles

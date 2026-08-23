@@ -1,5 +1,5 @@
 /* Creates (or resets) the initial administrator account. */
-require('dotenv').config();
+require('../src/config/env');
 const bcrypt = require('bcryptjs');
 const pool = require('../src/db/pool');
 

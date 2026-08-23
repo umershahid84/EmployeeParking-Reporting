@@ -18,7 +18,10 @@ function signToken(user) {
   return jwt.sign(
     { id: user.id, name: user.name, email: user.email, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+      algorithm: process.env.JWT_ALGORITHM || 'HS256',
+    }
   );
 }
 

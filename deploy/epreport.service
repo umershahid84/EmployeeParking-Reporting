@@ -1,0 +1,37 @@
+[Unit]
+Description=Employee Parking Daily Reporting Application
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+
+# --- Edit these two lines for your host ---
+User=epreport
+WorkingDirectory=/opt/epreport
+# --------------------------------------------
+
+# Loads DB_*, EMAIL_*, JWT_*, etc. from the app's .env file.
+EnvironmentFile=/opt/epreport/.env
+Environment=NODE_ENV=production
+
+# Runs the server entry point directly (rather than via `npm start`) so
+# systemd tracks the actual Node process and can signal/restart it cleanly.
+# The server itself serves the pre-built client from client/dist.
+ExecStart=/usr/bin/env node server/src/index.js
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=epreport
+
+# Basic hardening. Relax if the app needs to write outside these paths
+# (it currently doesn't - all persistent state lives in MariaDB).
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

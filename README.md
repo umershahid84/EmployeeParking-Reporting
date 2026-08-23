@@ -6,51 +6,75 @@ orders, and shift notes — across the four Employee Parking shifts (Day,
 Swing, Graveyard, Bridge). Managers and Administrators review reports,
 leave comments, and manage users, drivers, and shuttles.
 
+This is packaged as **one application**: the Express API serves the built
+React client itself, so there's a single install, a single build, and a
+single start command — no separate frontend/backend processes.
+
 ## Stack
 
 - **Backend:** Node.js / Express, MariaDB (via `mysql2`), JWT auth, bcrypt password hashing, nodemailer for password-reset email.
-- **Frontend:** React (Vite), React Router.
+- **Frontend:** React (Vite), React Router — built to static assets and served by the backend.
 
 ## Project layout
 
 ```
-server/   Express API + MariaDB schema and scripts
-client/   React (Vite) single-page app
+package.json     root workspace - install/build/start orchestrate both sides
+server/          Express API, MariaDB schema/scripts, and (in production) serves client/dist
+client/          React (Vite) single-page app
+deploy/          systemd unit + deployment instructions
 ```
 
-## Getting started
+## Configuration
 
-### 1. Database
-
-Create a MariaDB user/database and apply the schema:
+Copy `.env.example` to `.env` at the repo root and fill in real values:
 
 ```bash
-cd server
-cp .env.example .env   # fill in DB credentials, JWT secret, SMTP settings
-npm install
-npm run migrate         # applies server/src/db/schema.sql
-npm run seed:admin      # creates the first administrator account
+cp .env.example .env
 ```
+
+This single `.env` file configures the database, email, and authentication
+settings — see the comments in `.env.example` for every variable. It's
+loaded by `server/src/config/env.js`, which resolves the repo root
+regardless of the process's working directory, so it works the same way
+whether you run `npm start`, a systemd service, or the `migrate`/`seed:admin`
+scripts directly.
+
+`.env` is gitignored — never commit real secrets. Generate a strong
+`JWT_SECRET` with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+## Getting started (single application)
+
+```bash
+npm install        # installs both server and client dependencies (npm workspaces)
+npm run migrate     # creates the database and applies the schema
+npm run seed:admin  # creates the first administrator account
+npm run build       # builds the React client into client/dist
+npm start           # starts the Express API, which also serves the built client
+```
+
+That's it — one process serves both the API (under `/api/*`) and the web
+app, on the port set by `PORT` in `.env` (default `4000`).
 
 `npm run seed:admin` reads `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` /
-`SEED_ADMIN_NAME` from the environment (falls back to
-`admin@example.com` / `ChangeMe123!`). Change the password immediately
-after first login.
+`SEED_ADMIN_NAME` from `.env` (defaults shown in `.env.example`). Change the
+password immediately after first login.
 
-### 2. Backend API
+### Local development
 
-```bash
-cd server
-npm run dev      # nodemon, http://localhost:4000
-```
-
-### 3. Frontend
+If you'd rather run the Vite dev server (hot reload) alongside the API
+while developing, use:
 
 ```bash
-cd client
-npm install
-npm run dev       # http://localhost:5173, proxies /api to the backend
+npm run dev
 ```
+
+This runs both `server` (nodemon) and `client` (vite) concurrently, with
+the Vite dev server proxying `/api` requests to the backend. This is purely
+a development convenience — it is not how the app runs in production.
 
 ## Roles
 
@@ -67,10 +91,38 @@ dropdowns.
 
 ## Password reset
 
-`Forgot Password?` on the login page sends a 6-digit code (via SMTP,
-configured in `server/.env`) that expires after
+`Forgot Password?` on the login page sends a 6-digit code via the SMTP
+relay configured in `.env` (`EMAIL_*`). It expires after
 `PASSWORD_RESET_CODE_TTL_MINUTES` minutes, can only be used once, and is
-rate-limited against brute-force attempts.
+rate-limited against brute-force attempts. Set `SEND_EMAILS=false` to
+disable outbound mail entirely (the code is written to the application log
+instead) — no separate mail server process is required either way.
+
+## Running continuously as a Linux service (systemd)
+
+See [`deploy/README.md`](deploy/README.md) for full instructions. Summary:
+
+```bash
+sudo cp deploy/epreport.service /etc/systemd/system/epreport.service
+sudo systemctl daemon-reload
+sudo systemctl enable epreport
+sudo systemctl start epreport
+```
+
+Then manage it with the standard commands:
+
+```bash
+sudo systemctl start epreport
+sudo systemctl stop epreport
+sudo systemctl restart epreport
+sudo systemctl status epreport
+sudo journalctl -u epreport
+sudo journalctl -u epreport -f
+```
+
+The service runs under a dedicated non-root `epreport` system account,
+restarts automatically on crash (5s delay), starts on boot once enabled,
+and logs to the systemd journal.
 
 ## Notes on scope
 
