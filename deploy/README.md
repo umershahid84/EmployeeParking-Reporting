@@ -73,6 +73,18 @@ sudo journalctl -u epreport -f       # follow logs live
 cd /opt/epreport
 git pull
 npm install
+npm run migrate    # always run this - see note below
 npm run build
 sudo systemctl restart epreport
 ```
+
+**Always run `npm run migrate` on every update, even if you don't think this
+release touched the database.** The schema (`server/src/db/schema.sql`) is
+applied with `CREATE TABLE IF NOT EXISTS`, which only creates tables that
+don't exist yet - it does not alter a table that's already there. Any
+column added or changed on an existing table (like `daily_reports`) ships
+as an explicit, idempotent `ALTER TABLE ... ADD/DROP COLUMN IF [NOT]
+EXISTS` alongside the `CREATE TABLE` statements, specifically so `npm run
+migrate` stays safe to run on every deploy and brings an older database
+fully up to date. Skipping it after a release that changed the schema will
+surface as reports failing to save with a database column error.

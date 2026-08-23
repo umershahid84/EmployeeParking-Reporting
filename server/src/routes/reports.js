@@ -154,9 +154,10 @@ async function insertIncomingSupervisors(conn, reportId, userIds) {
 }
 
 /**
- * Emails every active daily-report recipient (managed in the Admin Portal)
- * that a report was submitted. Never throws - sendReportSubmittedEmail logs
- * failures per-recipient instead of blocking the submission response.
+ * Emails the submitting supervisor and every active daily-report recipient
+ * (managed in the Admin Portal) that a report was submitted. Never throws -
+ * sendReportSubmittedEmail logs failures per-recipient instead of blocking
+ * the submission response.
  */
 async function notifyReportSubmitted(reportId, actorUserId, ip) {
   const report = await loadReportFull(reportId);
@@ -165,12 +166,16 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
   const [recipientRows] = await pool.query(
     `SELECT email FROM email_recipients WHERE notification_type = 'daily_report' AND is_active = 1`
   );
-  if (!recipientRows.length) return;
 
-  const reportForEmail = { ...report, incomingSupervisorNames: report.incomingSupervisors.map((s) => s.user_name) };
+  const recipientEmails = [...new Set([
+    report.supervisor_email,
+    ...recipientRows.map((r) => r.email),
+  ].filter(Boolean).map((e) => e.toLowerCase()))];
 
-  for (const { email } of recipientRows) {
-    await sendReportSubmittedEmail({ toEmail: email, report: reportForEmail });
+  if (!recipientEmails.length) return;
+
+  for (const email of recipientEmails) {
+    await sendReportSubmittedEmail({ toEmail: email, report });
   }
 
   await recordAudit({
@@ -178,7 +183,7 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
     action: 'report_submission_email_sent',
     entity: 'daily_report',
     entityId: reportId,
-    details: { recipients: recipientRows.map((r) => r.email) },
+    details: { recipients: recipientEmails },
     ipAddress: ip,
   });
 }

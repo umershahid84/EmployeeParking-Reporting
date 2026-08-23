@@ -259,6 +259,21 @@ CREATE TABLE IF NOT EXISTS email_log (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
+-- Repairs for a database created before a later revision of this schema.
+--
+-- CREATE TABLE IF NOT EXISTS above only creates tables that don't exist yet
+-- - it never alters a daily_reports table that was already created by an
+-- earlier version of this file. Without these, a database set up before
+-- `submitted_at` was added would reject every report submission with
+-- "Unknown column 'submitted_at'" (MariaDB 10.0.2+ supports IF [NOT]
+-- EXISTS on ADD/DROP COLUMN, so these are safe to run every time, on a
+-- fresh database or a pre-existing one).
+-- ---------------------------------------------------------------------------
+ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS submitted_at DATETIME NULL AFTER notes;
+ALTER TABLE daily_reports DROP COLUMN IF EXISTS incoming_supervisor;
+ALTER TABLE daily_reports DROP COLUMN IF EXISTS work_orders;
+
+-- ---------------------------------------------------------------------------
 -- Seed an initial administrator (password must be reset on first login;
 -- default password hash below corresponds to "ChangeMe123!" — CHANGE IMMEDIATELY)
 -- ---------------------------------------------------------------------------

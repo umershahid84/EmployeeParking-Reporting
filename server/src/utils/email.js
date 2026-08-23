@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { recordEmailLog } = require('./emailLog');
+const { renderReportEmailHtml, renderReportEmailText } = require('./reportEmailTemplate');
 
 let transporter = null;
 
@@ -37,7 +38,7 @@ function appUrl() {
  * trail. Never throws - delivery failures are logged, not propagated,
  * so a broken mail relay can't block report submission or user creation.
  */
-async function sendMail({ to, subject, text, emailType, relatedEntity = null, relatedId = null }) {
+async function sendMail({ to, subject, text, html, emailType, relatedEntity = null, relatedId = null }) {
   if (!emailEnabled()) {
     console.log(`[email disabled] ${emailType} to ${to}: ${subject}`);
     await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'skipped', error: 'SEND_EMAILS is not "true"' });
@@ -46,7 +47,7 @@ async function sendMail({ to, subject, text, emailType, relatedEntity = null, re
 
   const from = process.env.EMAIL_SENDER || process.env.EMAIL_USER || 'no-reply@example.com';
   try {
-    await getTransporter().sendMail({ from, to, subject, text });
+    await getTransporter().sendMail({ from, to, subject, text, html });
     await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'sent' });
   } catch (err) {
     console.error(`Failed to send ${emailType} email to ${to}:`, err);
@@ -112,30 +113,21 @@ async function sendAccountSetupEmail({ toEmail, name, setupToken, userId, isRese
 }
 
 /**
- * Sent to every active email_recipients row when a Supervisor submits a
- * daily report.
+ * Sent to the submitting supervisor and to every active email_recipients
+ * row when a Daily Report is submitted. The email body is the full report
+ * (info, incoming supervisors, call-outs, shift coverage, work orders,
+ * notes) rendered as a professional HTML document, not just a summary.
  */
 async function sendReportSubmittedEmail({ toEmail, report }) {
-  const link = `${appUrl()}/reports/${report.id}`;
-  const incoming = report.incomingSupervisorNames?.length ? report.incomingSupervisorNames.join(', ') : 'Not specified';
-  const text = [
-    'Employee Parking Reporting System',
-    '',
-    'A daily report has been submitted.',
-    '',
-    `Report ID: ${report.id}`,
-    `Report Date: ${report.report_date}`,
-    `Shift: ${report.shift_name}`,
-    `Submitting Supervisor: ${report.supervisor_name}`,
-    `Incoming Supervisor(s): ${incoming}`,
-    '',
-    `View the report: ${link}`,
-  ].join('\n');
+  const viewUrl = `${appUrl()}/reports/${report.id}`;
+  const html = renderReportEmailHtml(report, { viewUrl });
+  const text = renderReportEmailText(report, { viewUrl });
 
   await sendMail({
     to: toEmail,
     subject: `Daily Report Submitted - ${report.report_date} (${report.shift_name})`,
     text,
+    html,
     emailType: 'report_submitted',
     relatedEntity: 'daily_report',
     relatedId: report.id,
