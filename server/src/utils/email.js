@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { recordEmailLog } = require('./emailLog');
 
 let transporter = null;
 
@@ -21,9 +22,33 @@ function getTransporter() {
   return transporter;
 }
 
-async function sendPasswordResetCode(toEmail, code, ttlMinutes) {
+function appUrl() {
+  return (process.env.APP_URL || 'http://localhost:4000').replace(/\/+$/, '');
+}
+
+/**
+ * Sends a single email and records the outcome in the email_log audit
+ * trail. Never throws - delivery failures are logged, not propagated,
+ * so a broken mail relay can't block report submission or user creation.
+ */
+async function sendMail({ to, subject, text, emailType, relatedEntity = null, relatedId = null }) {
+  if (!emailEnabled()) {
+    console.log(`[email disabled] ${emailType} to ${to}: ${subject}`);
+    await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'skipped', error: 'SEND_EMAILS is not "true"' });
+    return;
+  }
+
   const from = process.env.EMAIL_SENDER || process.env.EMAIL_USER || 'no-reply@example.com';
-  const subject = 'Employee Parking Reporting System - Password Reset Code';
+  try {
+    await getTransporter().sendMail({ from, to, subject, text });
+    await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'sent' });
+  } catch (err) {
+    console.error(`Failed to send ${emailType} email to ${to}:`, err);
+    await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'failed', error: String(err.message || err) });
+  }
+}
+
+async function sendPasswordResetCode(toEmail, code, ttlMinutes) {
   const text = [
     'Employee Parking Reporting System',
     '',
@@ -36,19 +61,79 @@ async function sendPasswordResetCode(toEmail, code, ttlMinutes) {
     'If you did not request a password reset, you can ignore this email.',
   ].join('\n');
 
-  if (!emailEnabled()) {
-    // SEND_EMAILS=false: no mail server dependency required. Log instead so
-    // the reset flow is still usable in local/dev environments.
-    console.log(`[email disabled] Password reset code for ${toEmail}: ${code} (expires in ${ttlMinutes}m)`);
-    return;
-  }
-
-  try {
-    await getTransporter().sendMail({ from, to: toEmail, subject, text });
-  } catch (err) {
-    console.error('Failed to send password reset email:', err);
-    throw err;
-  }
+  await sendMail({
+    to: toEmail,
+    subject: 'Employee Parking Reporting System - Password Reset Code',
+    text,
+    emailType: 'password_reset_code',
+  });
 }
 
-module.exports = { sendPasswordResetCode, emailEnabled };
+/**
+ * Sent when a Manager/Administrator creates a new account, or triggers an
+ * admin reset. Contains a one-time secure setup link rather than a
+ * plain-text password.
+ */
+async function sendAccountSetupEmail({ toEmail, name, setupToken, userId, isReset }) {
+  const link = `${appUrl()}/setup-password?token=${encodeURIComponent(setupToken)}&uid=${userId}`;
+  const text = [
+    'Employee Parking Reporting System',
+    '',
+    isReset
+      ? `Hello ${name},`
+      : `Hello ${name}, an Employee Parking Reporting account has been created for you.`,
+    '',
+    isReset
+      ? 'Your account access has been reset. Use the secure link below to set a new password:'
+      : 'Use the secure link below to set your password and access the application:',
+    '',
+    link,
+    '',
+    'This link can only be used once and will expire soon for security reasons.',
+    'If you did not expect this email, please contact your administrator.',
+  ].join('\n');
+
+  await sendMail({
+    to: toEmail,
+    subject: isReset
+      ? 'Employee Parking Reporting - Account Access Reset'
+      : 'Employee Parking Reporting - Your Account Has Been Created',
+    text,
+    emailType: isReset ? 'account_reset' : 'account_created',
+    relatedEntity: 'user',
+    relatedId: userId,
+  });
+}
+
+/**
+ * Sent to every active email_recipients row when a Supervisor submits a
+ * daily report.
+ */
+async function sendReportSubmittedEmail({ toEmail, report }) {
+  const link = `${appUrl()}/reports/${report.id}`;
+  const incoming = report.incomingSupervisorNames?.length ? report.incomingSupervisorNames.join(', ') : 'Not specified';
+  const text = [
+    'Employee Parking Reporting System',
+    '',
+    'A daily report has been submitted.',
+    '',
+    `Report ID: ${report.id}`,
+    `Report Date: ${report.report_date}`,
+    `Shift: ${report.shift_name}`,
+    `Submitting Supervisor: ${report.supervisor_name}`,
+    `Incoming Supervisor(s): ${incoming}`,
+    '',
+    `View the report: ${link}`,
+  ].join('\n');
+
+  await sendMail({
+    to: toEmail,
+    subject: `Daily Report Submitted - ${report.report_date} (${report.shift_name})`,
+    text,
+    emailType: 'report_submitted',
+    relatedEntity: 'daily_report',
+    relatedId: report.id,
+  });
+}
+
+module.exports = { sendPasswordResetCode, sendAccountSetupEmail, sendReportSubmittedEmail, emailEnabled };

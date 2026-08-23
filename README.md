@@ -1,10 +1,11 @@
 # Employee Parking Daily Reporting Application
 
 A web application for Employee Parking Supervisors to document daily
-operational activities — driver call-outs, shift coverage, bus issues, work
-orders, and shift notes — across the four Employee Parking shifts (Day,
-Swing, Graveyard, Bridge). Managers and Administrators review reports,
-leave comments, and manage users, drivers, and shuttles.
+operational activities — incoming supervisor handoff, driver call-outs,
+shift coverage, work orders, and shift notes — across the four Employee
+Parking shifts (Day, Swing, Graveyard, Bridge). Managers and Administrators
+review reports, leave comments, and manage users, drivers, shuttles, and
+the email notification distribution list.
 
 This is packaged as **one application**: the Express API serves the built
 React client itself, so there's a single install, a single build, and a
@@ -90,7 +91,7 @@ a development convenience — it is not how the app runs in production.
 - **Supervisor** — creates/edits their own daily reports, views all reports.
 - **Manager** — views all reports, filters/searches, adds comments.
 - **Administrator** — all Manager permissions, plus user/driver/shuttle
-  management and audit log access.
+  management, the email notification distribution list, and audit log access.
 
 Report edit permission is enforced server-side: a supervisor can only edit
 a report they personally submitted (administrators can edit any report).
@@ -98,14 +99,55 @@ Every edit is appended to an immutable report history; deactivated drivers
 and shuttles remain visible on historical reports but drop out of new-entry
 dropdowns.
 
+## Daily report sections
+
+- **Incoming Supervisor(s)** — multi-select from active Supervisor accounts.
+- **Driver Call-Outs** — shuttle/bus, driver, comments; add/remove rows.
+- **Shift Coverage** — one of three types per entry, with fields that adapt
+  to the selection: *Shift Covered with OT* (shuttle, driver, comments),
+  *Moved from Another Shuttle* (shuttle, driver, original shuttle,
+  comments), or *Shift Not Covered for Bus Issues* (affected shuttle,
+  comments — no driver). Multiple entries per report.
+- **Work Order Placed** — location (`LOT - A`, `LOT - C`, or
+  `North Employee Parking Lot`) plus comments; date/time and the entering
+  supervisor are recorded automatically. Multiple entries per report.
+- Bus issues, significant shift activity, and additional notes remain
+  free-text fields.
+
+Every one of these — incoming supervisors, call-outs, shift coverage, and
+work orders — is versioned in the report's history alongside who changed it
+and when.
+
+## Email notifications
+
+The app sends three kinds of email, all through the SMTP relay configured
+in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
+`sent`/`failed`/`skipped`) as a permanent audit trail:
+
+1. **New account created** — when a Manager/Administrator creates a user
+   (or triggers **Reset Account**), the app never emails a plain-text
+   password. Instead it emails a one-time secure link
+   (`/setup-password?...`, valid for `ACCOUNT_SETUP_TOKEN_TTL_HOURS`,
+   default 48h) that lets the user set their own password.
+2. **Password reset** — the existing 6-digit forgot-password code.
+3. **Daily report submitted** — when a Supervisor submits a report (on
+   initial submit, not on later edits), every **active** address in the
+   Admin Portal's **Email Notifications** distribution list receives a
+   summary (report ID, date, shift, submitting/incoming supervisors) with a
+   link to the report. Administrators manage that list — add, edit, remove,
+   enable/disable — entirely through the UI; nothing is hard-coded, so no
+   code change or redeploy is needed to change who gets notified.
+
+Set `SEND_EMAILS=false` to disable outbound mail entirely — every email is
+logged instead of sent (still recorded in `email_log` with status
+`skipped`), so no mail server is required for local development.
+
 ## Password reset
 
 `Forgot Password?` on the login page sends a 6-digit code via the SMTP
 relay configured in `.env` (`EMAIL_*`). It expires after
 `PASSWORD_RESET_CODE_TTL_MINUTES` minutes, can only be used once, and is
-rate-limited against brute-force attempts. Set `SEND_EMAILS=false` to
-disable outbound mail entirely (the code is written to the application log
-instead) — no separate mail server process is required either way.
+rate-limited against brute-force attempts.
 
 ## Running continuously as a Linux service (systemd)
 
@@ -136,8 +178,10 @@ and logs to the systemd journal.
 ## Notes on scope
 
 This build covers the core workflow end-to-end (auth, RBAC, daily reports
-with call-outs/shift-fills, edit history, manager comments, admin
-management of users/drivers/shuttles, audit logging, password reset). The
-architecture is modular (separate route/table per concern) so future
-sections — equipment/vehicle inspections, incident reporting, exports,
-dashboard charts, etc. — can be added without restructuring what's here.
+with incoming supervisors/call-outs/shift coverage/work orders, edit
+history, manager comments, admin management of users/drivers/shuttles/email
+recipients, audit logging, password reset, account setup and report
+submission email notifications). The architecture is modular (separate
+route/table per concern) so future sections — equipment/vehicle
+inspections, incident reporting, exports, dashboard charts, etc. — can be
+added without restructuring what's here.

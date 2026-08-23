@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import SetupPassword from './pages/SetupPassword';
 import ChangePassword from './pages/ChangePassword';
 import Dashboard from './pages/Dashboard';
 import ReportsList from './pages/ReportsList';
@@ -16,6 +17,7 @@ import AdminHome from './pages/admin/AdminHome';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminDrivers from './pages/admin/AdminDrivers';
 import AdminShuttles from './pages/admin/AdminShuttles';
+import AdminEmailRecipients from './pages/admin/AdminEmailRecipients';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 
 export default function App() {
@@ -25,6 +27,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/setup-password" element={<SetupPassword />} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
@@ -39,6 +42,7 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="drivers" element={<AdminDrivers />} />
             <Route path="shuttles" element={<AdminShuttles />} />
+            <Route path="email-notifications" element={<AdminEmailRecipients />} />
             <Route path="audit" element={<AdminAuditLog />} />
           </Route>
         </Route>

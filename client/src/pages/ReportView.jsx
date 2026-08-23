@@ -3,6 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
+const COVERAGE_LABELS = {
+  ot: 'Shift Covered with OT',
+  moved: 'Moved from Another Shuttle',
+  not_covered: 'Shift Not Covered for Bus Issues',
+};
+
 export default function ReportView() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -41,13 +47,16 @@ export default function ReportView() {
         {report.canEdit && <Link className="button" to={`/reports/${report.id}/edit`}>Edit</Link>}
       </div>
       <p className="muted">Supervisor: {report.supervisor_name} · Status: {report.status} · Last modified {new Date(report.updated_at).toLocaleString()}</p>
+      <p className="muted">
+        Incoming Supervisor(s): {report.incomingSupervisors.length ? report.incomingSupervisors.map((s) => s.user_name).join(', ') : '—'}
+      </p>
 
       <section className="card">
         <h3>Driver Call-Outs</h3>
         {report.callouts.length === 0 && <p className="muted">None reported.</p>}
         {report.callouts.length > 0 && (
           <table className="data-table">
-            <thead><tr><th>Shuttle</th><th>Driver</th><th>Information</th></tr></thead>
+            <thead><tr><th>Shuttle/Bus #</th><th>Driver</th><th>Comments</th></tr></thead>
             <tbody>
               {report.callouts.map((c) => (
                 <tr key={c.id}><td>{c.shuttle_number || '—'}</td><td>{c.driver_name || '—'}</td><td>{c.notes || '—'}</td></tr>
@@ -58,19 +67,39 @@ export default function ReportView() {
       </section>
 
       <section className="card">
-        <h3>Driver Shift Fills</h3>
-        {report.shiftFills.length === 0 && <p className="muted">None reported.</p>}
-        {report.shiftFills.length > 0 && (
+        <h3>Shift Coverage</h3>
+        {report.shiftCoverage.length === 0 && <p className="muted">None reported.</p>}
+        {report.shiftCoverage.length > 0 && (
           <table className="data-table">
-            <thead><tr><th>Shuttle</th><th>Driver</th><th>Coverage</th><th>Moved From</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Coverage Type</th><th>Shuttle/Bus #</th><th>Driver</th><th>Moved From</th><th>Comments</th></tr></thead>
             <tbody>
-              {report.shiftFills.map((f) => (
-                <tr key={f.id}>
-                  <td>{f.shuttle_number || '—'}</td>
-                  <td>{f.driver_name || '—'}</td>
-                  <td>{f.coverage_type === 'moved' ? 'Moved from another shuttle' : 'Already assigned'}</td>
-                  <td>{f.original_shuttle_number || '—'}</td>
-                  <td>{f.notes || '—'}</td>
+              {report.shiftCoverage.map((c) => (
+                <tr key={c.id}>
+                  <td>{COVERAGE_LABELS[c.coverage_type] || c.coverage_type}</td>
+                  <td>{c.shuttle_number || '—'}</td>
+                  <td>{c.driver_name || '—'}</td>
+                  <td>{c.original_shuttle_number || '—'}</td>
+                  <td>{c.notes || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>Work Order Placed</h3>
+        {report.workOrders.length === 0 && <p className="muted">None reported.</p>}
+        {report.workOrders.length > 0 && (
+          <table className="data-table">
+            <thead><tr><th>Location</th><th>Comments</th><th>Entered By</th><th>Date/Time</th></tr></thead>
+            <tbody>
+              {report.workOrders.map((w) => (
+                <tr key={w.id}>
+                  <td>{w.location}</td>
+                  <td>{w.comments || '—'}</td>
+                  <td>{w.user_name}</td>
+                  <td>{new Date(w.created_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -81,10 +110,8 @@ export default function ReportView() {
       <section className="card">
         <h3>Shift Notes</h3>
         <p><strong>Bus Issues:</strong> {report.bus_issues || '—'}</p>
-        <p><strong>Work Orders:</strong> {report.work_orders || '—'}</p>
         <p><strong>Significant Activity:</strong> {report.significant_activity || '—'}</p>
-        <p><strong>Incoming Supervisor:</strong> {report.incoming_supervisor || '—'}</p>
-        <p><strong>Other Notes:</strong> {report.notes || '—'}</p>
+        <p><strong>Additional Notes:</strong> {report.notes || '—'}</p>
       </section>
 
       <section className="card">

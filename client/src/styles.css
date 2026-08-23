@@ -118,6 +118,11 @@ legend { font-weight: 700; padding: 0 6px; }
 
 .row-editor { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .row-editor select, .row-editor input { flex: 1; min-width: 140px; }
+.coverage-row select, .coverage-row input { min-width: 160px; }
+
+.checkbox-list { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.checkbox-item { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; margin-bottom: 0; }
+.checkbox-item input { width: auto; }
 
 .form-actions { display: flex; gap: 12px; margin-top: 10px; }
 

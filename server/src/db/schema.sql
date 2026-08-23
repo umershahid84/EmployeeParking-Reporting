@@ -74,10 +74,9 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   supervisor_id INT NOT NULL,
   status ENUM('draft', 'submitted', 'edited', 'reviewed') NOT NULL DEFAULT 'draft',
   bus_issues TEXT NULL,
-  work_orders TEXT NULL,
   significant_activity TEXT NULL,
-  incoming_supervisor VARCHAR(150) NULL,
   notes TEXT NULL,
+  submitted_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (shift_id) REFERENCES shifts(id),
@@ -85,6 +84,19 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   INDEX idx_report_date (report_date),
   INDEX idx_shift (shift_id),
   INDEX idx_supervisor (supervisor_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Incoming Supervisors (multi-select handoff for a report)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS report_incoming_supervisors (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  report_id INT NOT NULL,
+  user_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (report_id) REFERENCES daily_reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  UNIQUE KEY uniq_report_incoming_supervisor (report_id, user_id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
@@ -103,14 +115,17 @@ CREATE TABLE IF NOT EXISTS driver_callouts (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
--- Driver Shift Fills
+-- Shift Coverage
+--   'ot'          - shift covered with overtime: shuttle_id + driver_id
+--   'moved'       - driver moved from another shuttle: shuttle_id + driver_id + original_shuttle_id
+--   'not_covered' - shift not covered due to a bus issue: shuttle_id only (no driver)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS driver_shift_fills (
+CREATE TABLE IF NOT EXISTS shift_coverage (
   id INT PRIMARY KEY AUTO_INCREMENT,
   report_id INT NOT NULL,
+  coverage_type ENUM('ot', 'moved', 'not_covered') NOT NULL,
   shuttle_id INT NULL,
   driver_id INT NULL,
-  coverage_type ENUM('assigned', 'moved') NOT NULL DEFAULT 'assigned',
   original_shuttle_id INT NULL,
   notes VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -118,6 +133,20 @@ CREATE TABLE IF NOT EXISTS driver_shift_fills (
   FOREIGN KEY (shuttle_id) REFERENCES shuttles(id),
   FOREIGN KEY (driver_id) REFERENCES drivers(id),
   FOREIGN KEY (original_shuttle_id) REFERENCES shuttles(id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Work Orders Placed
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS work_orders (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  report_id INT NOT NULL,
+  location ENUM('LOT - A', 'LOT - C', 'North Employee Parking Lot') NOT NULL,
+  comments TEXT NULL,
+  user_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (report_id) REFERENCES daily_reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
@@ -180,6 +209,53 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
   used_at DATETIME NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_prc_user (user_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Account Setup / Reset Tokens
+-- Used both for a brand-new user's first sign-in and for an admin-triggered
+-- account reset. A one-time link, never a plain-text password, is emailed.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS account_setup_tokens (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  token_hash VARCHAR(255) NOT NULL,
+  purpose ENUM('initial_setup', 'admin_reset') NOT NULL DEFAULT 'initial_setup',
+  expires_at DATETIME NOT NULL,
+  used TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  used_at DATETIME NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_ast_user (user_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Email Notification Recipients (managed via the Admin Portal, not code)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_recipients (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  email VARCHAR(190) NOT NULL,
+  notification_type VARCHAR(50) NOT NULL DEFAULT 'daily_report',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_email_recipient (email, notification_type)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Email Delivery Log (audit trail of every email the app sends/attempts)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_log (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  email_type VARCHAR(50) NOT NULL,
+  recipient_email VARCHAR(190) NOT NULL,
+  related_entity VARCHAR(50) NULL,
+  related_id INT NULL,
+  status ENUM('sent', 'failed', 'skipped') NOT NULL,
+  error TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email_log_type (email_type),
+  INDEX idx_email_log_related (related_entity, related_id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------

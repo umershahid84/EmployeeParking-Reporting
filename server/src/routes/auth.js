@@ -13,6 +13,7 @@ const router = express.Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 const resetRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 const resetVerifyLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const setupPasswordLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
 function signToken(user) {
   return jwt.sign(
@@ -176,6 +177,52 @@ router.post('/reset-password', resetVerifyLimiter, async (req, res) => {
   await recordAudit({ userId: user.id, action: 'password_reset', ipAddress: req.ip });
 
   res.json({ ok: true, message: 'Your password has been successfully reset.' });
+});
+
+// POST /api/auth/setup-password - used both for a brand-new account's first
+// sign-in and for completing an admin-triggered account reset. Consumes the
+// one-time token emailed by sendAccountSetupEmail.
+router.post('/setup-password', setupPasswordLimiter, async (req, res) => {
+  const { uid, token, newPassword, confirmPassword } = req.body || {};
+  if (!uid || !token || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: 'Passwords do not match.' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+
+  const [userRows] = await pool.query('SELECT id FROM users WHERE id = ? AND is_active = 1', [uid]);
+  if (!userRows[0]) {
+    return res.status(400).json({ error: 'Invalid or expired setup link.' });
+  }
+
+  const [tokenRows] = await pool.query(
+    `SELECT * FROM account_setup_tokens
+     WHERE user_id = ? AND used = 0 AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
+    [uid]
+  );
+  const setupRecord = tokenRows[0];
+  if (!setupRecord) {
+    return res.status(400).json({ error: 'Invalid or expired setup link.' });
+  }
+
+  const tokenValid = await bcrypt.compare(token, setupRecord.token_hash);
+  if (!tokenValid) {
+    return res.status(400).json({ error: 'Invalid or expired setup link.' });
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, uid]);
+  await pool.query('UPDATE account_setup_tokens SET used = 1, used_at = NOW() WHERE id = ?', [setupRecord.id]);
+  await pool.query('UPDATE account_setup_tokens SET used = 1 WHERE user_id = ? AND used = 0', [uid]);
+
+  await recordAudit({ userId: Number(uid), action: 'account_setup_completed', ipAddress: req.ip });
+
+  res.json({ ok: true, message: 'Your password has been set. You can now sign in.' });
 });
 
 module.exports = router;

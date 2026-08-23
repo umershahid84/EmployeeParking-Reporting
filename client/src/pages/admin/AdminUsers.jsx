@@ -19,8 +19,8 @@ export default function AdminUsers() {
     e.preventDefault();
     setError(''); setMessage('');
     try {
-      const { data } = await api.post('/users', { name, email, role });
-      setMessage(data.temporaryPassword ? `User created. Temporary password: ${data.temporaryPassword}` : 'User created.');
+      await api.post('/users', { name, email, role });
+      setMessage(`Account created. A secure setup link was emailed to ${email}.`);
       setName(''); setEmail(''); setRole('supervisor');
       load();
     } catch (err) {
@@ -39,8 +39,8 @@ export default function AdminUsers() {
   }
 
   async function resetAccount(u) {
-    const { data } = await api.post(`/users/${u.id}/reset-account`);
-    setMessage(`Temporary password for ${u.email}: ${data.temporaryPassword}`);
+    await api.post(`/users/${u.id}/reset-account`);
+    setMessage(`Account access reset. A secure setup link was emailed to ${u.email}.`);
   }
 
   return (

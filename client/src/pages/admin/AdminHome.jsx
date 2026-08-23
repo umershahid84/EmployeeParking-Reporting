@@ -6,6 +6,7 @@ export default function AdminHome() {
     { path: '/admin/users', label: 'Users' },
     { path: '/admin/drivers', label: 'Drivers' },
     { path: '/admin/shuttles', label: 'Shuttles' },
+    { path: '/admin/email-notifications', label: 'Email Notifications' },
     { path: '/admin/audit', label: 'Audit Logs' },
   ];
   return (

@@ -1,28 +1,34 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const emptyCallout = () => ({ shuttleId: '', driverId: '', notes: '' });
-const emptyShiftFill = () => ({ shuttleId: '', driverId: '', coverageType: 'assigned', originalShuttleId: '', notes: '' });
+const emptyCoverage = () => ({ coverageType: 'ot', shuttleId: '', driverId: '', originalShuttleId: '', notes: '' });
+const emptyWorkOrder = () => ({ location: '', comments: '' });
+
+const WORK_ORDER_LOCATIONS = ['LOT - A', 'LOT - C', 'North Employee Parking Lot'];
 
 export default function ReportForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [shifts, setShifts] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [shuttles, setShuttles] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
 
   const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10));
   const [shiftId, setShiftId] = useState('');
   const [busIssues, setBusIssues] = useState('');
-  const [workOrders, setWorkOrders] = useState('');
   const [significantActivity, setSignificantActivity] = useState('');
-  const [incomingSupervisor, setIncomingSupervisor] = useState('');
   const [notes, setNotes] = useState('');
+  const [incomingSupervisorIds, setIncomingSupervisorIds] = useState([]);
   const [callouts, setCallouts] = useState([emptyCallout()]);
-  const [shiftFills, setShiftFills] = useState([emptyShiftFill()]);
+  const [shiftCoverage, setShiftCoverage] = useState([emptyCoverage()]);
+  const [workOrders, setWorkOrders] = useState([emptyWorkOrder()]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,10 +37,12 @@ export default function ReportForm() {
       api.get('/shifts'),
       api.get('/drivers'),
       api.get('/shuttles'),
-    ]).then(([s, d, sh]) => {
+      api.get('/supervisors'),
+    ]).then(([s, d, sh, sup]) => {
       setShifts(s.data.shifts);
       setDrivers(d.data.drivers);
       setShuttles(sh.data.shuttles);
+      setSupervisors(sup.data.supervisors);
     });
   }, []);
 
@@ -45,20 +53,26 @@ export default function ReportForm() {
       setReportDate(r.report_date);
       setShiftId(r.shift_id);
       setBusIssues(r.bus_issues || '');
-      setWorkOrders(r.work_orders || '');
       setSignificantActivity(r.significant_activity || '');
-      setIncomingSupervisor(r.incoming_supervisor || '');
       setNotes(r.notes || '');
+      setIncomingSupervisorIds(r.incomingSupervisors.map((s) => String(s.user_id)));
       setCallouts(r.callouts.length ? r.callouts.map((c) => ({ shuttleId: c.shuttle_id || '', driverId: c.driver_id || '', notes: c.notes || '' })) : [emptyCallout()]);
-      setShiftFills(r.shiftFills.length ? r.shiftFills.map((f) => ({
-        shuttleId: f.shuttle_id || '', driverId: f.driver_id || '', coverageType: f.coverage_type,
-        originalShuttleId: f.original_shuttle_id || '', notes: f.notes || '',
-      })) : [emptyShiftFill()]);
+      setShiftCoverage(r.shiftCoverage.length ? r.shiftCoverage.map((c) => ({
+        coverageType: c.coverage_type, shuttleId: c.shuttle_id || '', driverId: c.driver_id || '',
+        originalShuttleId: c.original_shuttle_id || '', notes: c.notes || '',
+      })) : [emptyCoverage()]);
+      setWorkOrders(r.workOrders.length ? r.workOrders.map((w) => ({ location: w.location, comments: w.comments || '' })) : [emptyWorkOrder()]);
     });
   }, [id, isEdit]);
 
   function updateRow(setter, index, key, value) {
     setter((rows) => rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
+  }
+
+  function toggleIncomingSupervisor(supervisorId) {
+    setIncomingSupervisorIds((ids) => (
+      ids.includes(supervisorId) ? ids.filter((x) => x !== supervisorId) : [...ids, supervisorId]
+    ));
   }
 
   async function handleSubmit(e, status) {
@@ -67,9 +81,11 @@ export default function ReportForm() {
     setSubmitting(true);
     const payload = {
       reportDate, shiftId, status,
-      busIssues, workOrders, significantActivity, incomingSupervisor, notes,
+      busIssues, significantActivity, notes,
+      incomingSupervisorIds,
       callouts: callouts.filter((c) => c.shuttleId || c.driverId || c.notes),
-      shiftFills: shiftFills.filter((f) => f.shuttleId || f.driverId || f.notes),
+      shiftCoverage: shiftCoverage.filter((c) => c.shuttleId || c.driverId || c.notes),
+      workOrders: workOrders.filter((w) => w.location || w.comments),
     };
     try {
       if (isEdit) {
@@ -100,21 +116,41 @@ export default function ReportForm() {
               {shifts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
+          <label>Supervisor
+            <input value={user.name} disabled />
+          </label>
         </div>
+
+        <fieldset>
+          <legend>Incoming Supervisor(s)</legend>
+          {supervisors.length === 0 && <p className="muted">No active supervisor accounts found.</p>}
+          <div className="checkbox-list">
+            {supervisors.map((s) => (
+              <label key={s.id} className="checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={incomingSupervisorIds.includes(String(s.id))}
+                  onChange={() => toggleIncomingSupervisor(String(s.id))}
+                />
+                {s.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <fieldset>
           <legend>Driver Call-Outs</legend>
           {callouts.map((c, i) => (
             <div className="row-editor" key={i}>
               <select value={c.shuttleId} onChange={(e) => updateRow(setCallouts, i, 'shuttleId', e.target.value)}>
-                <option value="">Shuttle #</option>
+                <option value="">Shuttle/Bus #</option>
                 {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
               </select>
               <select value={c.driverId} onChange={(e) => updateRow(setCallouts, i, 'driverId', e.target.value)}>
                 <option value="">Driver</option>
                 {drivers.map((d) => <option key={d.id} value={d.id}>{d.driver_name}</option>)}
               </select>
-              <input placeholder="Additional information" value={c.notes} onChange={(e) => updateRow(setCallouts, i, 'notes', e.target.value)} />
+              <input placeholder="Comments" value={c.notes} onChange={(e) => updateRow(setCallouts, i, 'notes', e.target.value)} />
               <button type="button" onClick={() => setCallouts((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
             </div>
           ))}
@@ -122,47 +158,63 @@ export default function ReportForm() {
         </fieldset>
 
         <fieldset>
-          <legend>Driver Shift Fills</legend>
-          {shiftFills.map((f, i) => (
-            <div className="row-editor" key={i}>
-              <select value={f.shuttleId} onChange={(e) => updateRow(setShiftFills, i, 'shuttleId', e.target.value)}>
-                <option value="">Shuttle needing coverage</option>
+          <legend>Shift Coverage</legend>
+          {shiftCoverage.map((c, i) => (
+            <div className="row-editor coverage-row" key={i}>
+              <select value={c.coverageType} onChange={(e) => updateRow(setShiftCoverage, i, 'coverageType', e.target.value)}>
+                <option value="ot">Shift Covered with OT</option>
+                <option value="moved">Moved from Another Shuttle</option>
+                <option value="not_covered">Shift Not Covered for Bus Issues</option>
+              </select>
+
+              <select value={c.shuttleId} onChange={(e) => updateRow(setShiftCoverage, i, 'shuttleId', e.target.value)}>
+                <option value="">{c.coverageType === 'not_covered' ? 'Affected Shuttle/Bus #' : 'Shuttle #'}</option>
                 {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
               </select>
-              <select value={f.driverId} onChange={(e) => updateRow(setShiftFills, i, 'driverId', e.target.value)}>
-                <option value="">Driver filling shift</option>
-                {drivers.map((d) => <option key={d.id} value={d.id}>{d.driver_name}</option>)}
-              </select>
-              <select value={f.coverageType} onChange={(e) => updateRow(setShiftFills, i, 'coverageType', e.target.value)}>
-                <option value="assigned">Already assigned</option>
-                <option value="moved">Moved from another shuttle</option>
-              </select>
-              {f.coverageType === 'moved' && (
-                <select value={f.originalShuttleId} onChange={(e) => updateRow(setShiftFills, i, 'originalShuttleId', e.target.value)}>
+
+              {c.coverageType !== 'not_covered' && (
+                <select value={c.driverId} onChange={(e) => updateRow(setShiftCoverage, i, 'driverId', e.target.value)}>
+                  <option value="">Driver</option>
+                  {drivers.map((d) => <option key={d.id} value={d.id}>{d.driver_name}</option>)}
+                </select>
+              )}
+
+              {c.coverageType === 'moved' && (
+                <select value={c.originalShuttleId} onChange={(e) => updateRow(setShiftCoverage, i, 'originalShuttleId', e.target.value)}>
                   <option value="">Moved from shuttle #</option>
                   {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
                 </select>
               )}
-              <input placeholder="Notes" value={f.notes} onChange={(e) => updateRow(setShiftFills, i, 'notes', e.target.value)} />
-              <button type="button" onClick={() => setShiftFills((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
+
+              <input placeholder="Comments" value={c.notes} onChange={(e) => updateRow(setShiftCoverage, i, 'notes', e.target.value)} />
+              <button type="button" onClick={() => setShiftCoverage((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
             </div>
           ))}
-          <button type="button" onClick={() => setShiftFills((rows) => [...rows, emptyShiftFill()])}>+ Add Shift Fill</button>
+          <button type="button" onClick={() => setShiftCoverage((rows) => [...rows, emptyCoverage()])}>+ Add Shift Coverage</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Work Order Placed</legend>
+          {workOrders.map((w, i) => (
+            <div className="row-editor" key={i}>
+              <select value={w.location} onChange={(e) => updateRow(setWorkOrders, i, 'location', e.target.value)}>
+                <option value="">Location…</option>
+                {WORK_ORDER_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+              </select>
+              <input placeholder="Comments" value={w.comments} onChange={(e) => updateRow(setWorkOrders, i, 'comments', e.target.value)} />
+              <button type="button" onClick={() => setWorkOrders((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setWorkOrders((rows) => [...rows, emptyWorkOrder()])}>+ Add Work Order</button>
         </fieldset>
 
         <label>Bus Issues / Problems Reported
           <textarea value={busIssues} onChange={(e) => setBusIssues(e.target.value)} rows={2} />
         </label>
-        <label>Work Orders Placed
-          <textarea value={workOrders} onChange={(e) => setWorkOrders(e.target.value)} rows={2} />
-        </label>
         <label>Significant Shift Activity To Report
           <textarea value={significantActivity} onChange={(e) => setSignificantActivity(e.target.value)} rows={4} />
         </label>
-        <label>Incoming Supervisor
-          <input value={incomingSupervisor} onChange={(e) => setIncomingSupervisor(e.target.value)} />
-        </label>
-        <label>Other Notes
+        <label>Additional Notes
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
 
