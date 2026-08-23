@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db/pool');
-const { requireAuth, requireMinRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requireMinRole } = require('../middleware/auth');
 const { recordAudit } = require('../utils/audit');
 const { recordHistory } = require('../utils/history');
 const { sendReportSubmittedEmail } = require('../utils/email');
@@ -226,10 +226,10 @@ router.get('/:id', requireAuth, async (req, res) => {
   res.json({ report: { ...report, canEdit: canEdit(report, req.user) } });
 });
 
-// POST /api/reports - create (supervisor or administrator)
-router.post('/', requireAuth, requireMinRole('supervisor'), async (req, res) => {
-  if (req.user.role === 'manager') return res.status(403).json({ error: 'Managers cannot create reports.' });
-
+// POST /api/reports - create. Daily Reports are an operational Supervisor
+// function: Managers and Administrators are blocked here, not just hidden
+// in the UI, so the restriction can't be bypassed via direct API access.
+router.post('/', requireAuth, requireRole('supervisor'), async (req, res) => {
   const {
     reportDate, shiftId, status, busIssues, significantActivity, notes,
     incomingSupervisorIds, callouts, shiftCoverage, workOrders,
@@ -319,6 +319,13 @@ router.put('/:id', requireAuth, async (req, res) => {
   const desiredStatus = status === 'draft' ? 'draft' : (status ? 'submitted' : existing.status);
   const resultStatus = desiredStatus === 'draft' ? 'draft' : (existing.status === 'draft' ? 'submitted' : 'edited');
   const isNewlySubmitted = existing.status === 'draft' && resultStatus === 'submitted';
+
+  // Administrators can correct an already-submitted report, but submitting a
+  // Daily Report for the first time is a Supervisor-only action - enforced
+  // here, not just by hiding the button, so it can't be bypassed via the API.
+  if (isNewlySubmitted && req.user.role === 'administrator') {
+    return res.status(403).json({ error: 'Administrators cannot submit Daily Reports.' });
+  }
 
   const conn = await pool.getConnection();
   try {

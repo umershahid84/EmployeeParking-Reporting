@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function ReportsList() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [reports, setReports] = useState([]);
   const [shifts, setShifts] = useState([]);
-  const [filters, setFilters] = useState({ date: '', dateFrom: '', dateTo: '', shiftId: '', status: '' });
+  // supervisorId/driverId/shuttleId aren't exposed as their own controls here -
+  // they arrive via drill-down links from the Analytics dashboard.
+  const [filters, setFilters] = useState(() => ({
+    date: searchParams.get('date') || '',
+    dateFrom: searchParams.get('dateFrom') || '',
+    dateTo: searchParams.get('dateTo') || '',
+    shiftId: searchParams.get('shiftId') || '',
+    status: searchParams.get('status') || '',
+    supervisorId: searchParams.get('supervisorId') || '',
+    driverId: searchParams.get('driverId') || '',
+    shuttleId: searchParams.get('shuttleId') || '',
+  }));
 
   useEffect(() => {
     api.get('/shifts').then(({ data }) => setShifts(data.shifts));

@@ -26,6 +26,7 @@ export default function ReportForm() {
   const [significantActivity, setSignificantActivity] = useState('');
   const [notes, setNotes] = useState('');
   const [incomingSupervisorIds, setIncomingSupervisorIds] = useState([]);
+  const [existingStatus, setExistingStatus] = useState(null);
   const [callouts, setCallouts] = useState([emptyCallout()]);
   const [shiftCoverage, setShiftCoverage] = useState([emptyCoverage()]);
   const [workOrders, setWorkOrders] = useState([emptyWorkOrder()]);
@@ -50,6 +51,7 @@ export default function ReportForm() {
     if (!isEdit) return;
     api.get(`/reports/${id}`).then(({ data }) => {
       const r = data.report;
+      setExistingStatus(r.status);
       setReportDate(r.report_date);
       setShiftId(r.shift_id);
       setBusIssues(r.bus_issues || '');
@@ -221,8 +223,16 @@ export default function ReportForm() {
         {error && <div className="error-text">{error}</div>}
 
         <div className="form-actions">
-          <button type="button" disabled={submitting} onClick={(e) => handleSubmit(e, 'draft')}>Save Draft</button>
-          <button type="button" className="primary" disabled={submitting} onClick={(e) => handleSubmit(e, 'submitted')}>Submit Report</button>
+          {user.role === 'administrator' ? (
+            // Administrators can correct an existing report but cannot submit
+            // a Daily Report - the backend rejects that transition too.
+            <button type="button" className="primary" disabled={submitting} onClick={(e) => handleSubmit(e, existingStatus === 'draft' ? 'draft' : 'submitted')}>Save Changes</button>
+          ) : (
+            <>
+              <button type="button" disabled={submitting} onClick={(e) => handleSubmit(e, 'draft')}>Save Draft</button>
+              <button type="button" className="primary" disabled={submitting} onClick={(e) => handleSubmit(e, 'submitted')}>Submit Report</button>
+            </>
+          )}
         </div>
       </form>
     </div>

@@ -14,7 +14,7 @@ single start command — no separate frontend/backend processes.
 ## Stack
 
 - **Backend:** Node.js / Express, MariaDB (via `mysql2`), JWT auth, bcrypt password hashing, nodemailer for password-reset email.
-- **Frontend:** React (Vite), React Router — built to static assets and served by the backend.
+- **Frontend:** React (Vite), React Router, Recharts (Analytics dashboard) — built to static assets and served by the backend.
 
 ## Project layout
 
@@ -88,16 +88,25 @@ a development convenience — it is not how the app runs in production.
 
 ## Roles
 
-- **Supervisor** — creates/edits their own daily reports, views all reports.
-- **Manager** — views all reports, filters/searches, adds comments.
+- **Supervisor** — creates, drafts, and submits Daily Reports; views all
+  reports; can only edit reports they personally submitted.
+- **Manager** — views/searches/filters all reports, adds comments, views
+  the Analytics dashboard. Cannot create or submit Daily Reports.
 - **Administrator** — all Manager permissions, plus user/driver/shuttle
-  management, the email notification distribution list, and audit log access.
+  management, the email notification distribution list, and audit log
+  access. **Cannot create or submit Daily Reports either** — Daily Reports
+  are an operational Supervisor function. An Administrator can still open
+  and correct an existing (already-submitted) report, but cannot create a
+  new one or push a draft to "submitted"; both restrictions are enforced
+  server-side (`POST /api/reports` requires the `supervisor` role exactly,
+  and `PUT /api/reports/:id` rejects a draft→submitted transition from an
+  Administrator), not just hidden in the UI.
 
 Report edit permission is enforced server-side: a supervisor can only edit
-a report they personally submitted (administrators can edit any report).
-Every edit is appended to an immutable report history; deactivated drivers
-and shuttles remain visible on historical reports but drop out of new-entry
-dropdowns.
+a report they personally submitted (administrators can edit any report,
+subject to the submit restriction above). Every edit is appended to an
+immutable report history; deactivated drivers and shuttles remain visible
+on historical reports but drop out of new-entry dropdowns.
 
 ## Daily report sections
 
@@ -142,6 +151,37 @@ Set `SEND_EMAILS=false` to disable outbound mail entirely — every email is
 logged instead of sent (still recorded in `email_log` with status
 `skipped`), so no mail server is required for local development.
 
+## Analytics & Trends dashboard
+
+Available to Managers and Administrators (`/analytics`, gated server-side by
+`GET /api/analytics` requiring `manager` role or above) — not Supervisors.
+Every chart is computed live from MariaDB (no manually-maintained numbers),
+so submitting or editing a Daily Report is immediately reflected the next
+time the dashboard is loaded or a filter changes.
+
+- **Filters** (combine together, and every chart updates from one request
+  when any of them changes): date (Today / Yesterday / Last 7, 30, 90 Days /
+  This Month / Previous Month / Custom Range), Supervisor (multi-select, or
+  All), Shift (multi-select, or All), Driver, Shuttle/Bus.
+- **Overview** — stat tiles: total reports, call-outs, OT coverage, driver
+  movements, uncovered shifts, work orders.
+- **Trends** — one line chart per metric over the selected date range
+  (call-outs, OT coverage, driver movements, bus issues, work orders,
+  incoming supervisor handoffs).
+- **Comparisons** — grouped bar charts across all five metrics **by Shift**
+  and **by Supervisor** (select two supervisors to directly compare them —
+  the "All Supervisors" default just shows every supervisor with activity
+  in range), plus top-shuttle and top-driver breakdowns, and a work-orders-
+  by-location pie chart.
+- **Detailed Analysis** — a Driver Movement Details table (driver, from/to
+  shuttle, date, shift, supervisor, comments) and a Bus Issue Details table,
+  each row linking to the underlying report.
+- **Drill-down** — clicking a trend point or a comparison bar navigates to
+  **All Reports** pre-filtered to that date/supervisor/shift/shuttle/driver.
+- **Export** — the Export CSV button downloads one row per report (matching
+  the current filters) with each metric's count. Excel/PDF export are not
+  implemented yet — CSV covers the same filtered data in the meantime.
+
 ## Password reset
 
 `Forgot Password?` on the login page sends a 6-digit code via the SMTP
@@ -181,7 +221,8 @@ This build covers the core workflow end-to-end (auth, RBAC, daily reports
 with incoming supervisors/call-outs/shift coverage/work orders, edit
 history, manager comments, admin management of users/drivers/shuttles/email
 recipients, audit logging, password reset, account setup and report
-submission email notifications). The architecture is modular (separate
-route/table per concern) so future sections — equipment/vehicle
-inspections, incident reporting, exports, dashboard charts, etc. — can be
-added without restructuring what's here.
+submission email notifications, and a live Analytics/Trends dashboard with
+filtering, drill-down, and CSV export). The architecture is modular
+(separate route/table per concern) so future sections — equipment/vehicle
+inspections, incident reporting, Excel/PDF export, scheduled email digests,
+etc. — can be added without restructuring what's here.

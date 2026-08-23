@@ -16,9 +16,10 @@ export default function Layout() {
         <div className="brand">Employee Parking Daily Reporting</div>
         <nav>
           <Link to="/dashboard">Dashboard</Link>
-          <Link to="/reports/new">New Daily Report</Link>
+          {user?.role === 'supervisor' && <Link to="/reports/new">New Daily Report</Link>}
           <Link to="/reports">All Reports</Link>
           {user?.role !== 'supervisor' && <Link to="/manager">Manager</Link>}
+          {user?.role !== 'supervisor' && <Link to="/analytics">Analytics</Link>}
           {user?.role === 'administrator' && <Link to="/admin">Admin</Link>}
           <Link to="/change-password">Change Password</Link>
         </nav>

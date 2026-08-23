@@ -15,6 +15,7 @@ const shiftRoutes = require('./routes/shifts');
 const userRoutes = require('./routes/users');
 const supervisorRoutes = require('./routes/supervisors');
 const emailRecipientRoutes = require('./routes/emailRecipients');
+const analyticsRoutes = require('./routes/analytics');
 const auditRoutes = require('./routes/audit');
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/shifts', shiftRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/supervisors', supervisorRoutes);
 app.use('/api/email-recipients', emailRecipientRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api/audit', auditRoutes);
 
 // Any /api/* request that didn't match a route above is a genuine 404,

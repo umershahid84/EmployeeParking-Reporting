@@ -23,8 +23,9 @@ export default function Dashboard() {
       <p className="muted">{today} — {user.role}</p>
 
       <div className="quick-actions">
-        <Link className="button" to="/reports/new">Create Daily Report</Link>
+        {user.role === 'supervisor' && <Link className="button" to="/reports/new">Create Daily Report</Link>}
         <Link className="button secondary" to="/reports">All Reports</Link>
+        {user.role !== 'supervisor' && <Link className="button secondary" to="/analytics">Analytics &amp; Trends</Link>}
       </div>
 
       {user.role === 'supervisor' && (
