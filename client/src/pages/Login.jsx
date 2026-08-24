@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from '../components/Logo';
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,6 +27,7 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <div className="auth-logo"><Logo /></div>
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Employee Parking Reporting</h1>
         <label>Email / Username

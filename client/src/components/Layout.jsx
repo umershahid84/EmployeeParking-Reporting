@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from './Logo';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -13,7 +14,13 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header no-print">
-        <div className="brand">Employee Parking Daily Reporting</div>
+        <Link to="/dashboard" className="brand">
+          <Logo />
+          <span>
+            <div className="brand-title">Employee Parking Daily Reporting</div>
+            <div className="brand-subtitle">Port of Seattle</div>
+          </span>
+        </Link>
         <nav>
           <Link to="/dashboard">Dashboard</Link>
           {user?.role === 'supervisor' && <Link to="/reports/new">New Daily Report</Link>}

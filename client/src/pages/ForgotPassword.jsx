@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import Logo from '../components/Logo';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="auth-page">
+      <div className="auth-logo"><Logo /></div>
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Forgot Password</h1>
         <p>Enter your account email address. If it matches an account, we'll send a 6-digit verification code.</p>

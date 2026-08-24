@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const pool = require('../db/pool');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
 const { INK_PRIMARY, INK_SECONDARY, INK_MUTED, LINE } = require('../utils/pdfTable');
+const { LOGO_PATH, logoExists } = require('../utils/logo');
 
 const router = express.Router();
 
@@ -248,11 +249,11 @@ router.get('/export.csv', async (req, res) => {
     params
   );
 
-  const header = ['Report ID', 'Date', 'Shift', 'Supervisor', 'Status', 'Call-Outs', 'OT Coverage', 'Driver Movements', 'Uncovered Shifts', 'Work Orders'];
+  const header = ['Date', 'Shift', 'Supervisor', 'Status', 'Call-Outs', 'OT Coverage', 'Driver Movements', 'Uncovered Shifts', 'Work Orders'];
   const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [header.join(',')];
   for (const r of reportRows) {
-    lines.push([r.id, r.report_date, r.shift_name, r.supervisor_name, r.status, r.callouts, r.ot_coverage, r.driver_movements, r.uncovered_shifts, r.work_orders].map(csvEscape).join(','));
+    lines.push([r.report_date, r.shift_name, r.supervisor_name, r.status, r.callouts, r.ot_coverage, r.driver_movements, r.uncovered_shifts, r.work_orders].map(csvEscape).join(','));
   }
 
   res.setHeader('Content-Type', 'text/csv');
@@ -308,6 +309,12 @@ router.get('/export.pdf', async (req, res) => {
       doc.fontSize(9).fillColor(INK_SECONDARY).text(String(row[countKey] ?? 0), left + 350, y, { width: 80, align: 'right' });
       doc.y = y + 14;
     }
+  }
+
+  if (logoExists()) {
+    const logoTop = doc.y;
+    doc.image(LOGO_PATH, left, logoTop, { height: 34 });
+    doc.y = logoTop + 34 + 10;
   }
 
   doc.fontSize(18).fillColor(INK_PRIMARY).text('Employee Parking Analytics & Trends');

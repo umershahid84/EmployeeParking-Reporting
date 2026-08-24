@@ -1,0 +1,4 @@
+Place port-of-seattle-logo.png here (same file as client/public/port-of-seattle-logo.png).
+Used by PDF exports (server/src/utils/pdfTable.js, server/src/routes/analytics.js)
+and the report-submission email (server/src/utils/reportEmailTemplate.js).
+Gracefully skipped if this file does not exist.

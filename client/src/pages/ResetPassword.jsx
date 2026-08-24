@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import Logo from '../components/Logo';
 
 export default function ResetPassword() {
   const location = useLocation();
@@ -30,6 +31,7 @@ export default function ResetPassword() {
 
   return (
     <div className="auth-page">
+      <div className="auth-logo"><Logo /></div>
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Reset Password</h1>
         <label>Email

@@ -252,11 +252,11 @@ router.get('/', requireAuth, async (req, res) => {
 router.get('/export.csv', requireAuth, async (req, res) => {
   const reportRows = await queryReportList(req.query);
 
-  const header = ['Report ID', 'Date', 'Shift', 'Supervisor', 'Status', 'Last Modified'];
+  const header = ['Date', 'Shift', 'Supervisor', 'Status', 'Last Modified'];
   const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [header.join(',')];
   for (const r of reportRows) {
-    lines.push([r.id, r.report_date, r.shift_name, r.supervisor_name, r.status, r.updated_at].map(csvEscape).join(','));
+    lines.push([r.report_date, r.shift_name, r.supervisor_name, r.status, r.updated_at].map(csvEscape).join(','));
   }
 
   res.setHeader('Content-Type', 'text/csv');

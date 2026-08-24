@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import Logo from '../components/Logo';
 
 const COVERAGE_LABELS = {
   ot: 'Shift Covered with OT',
@@ -42,11 +43,24 @@ export default function ReportView() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h2>Daily Report — {report.report_date} ({report.shift_name})</h2>
-        {report.canEdit && <Link className="button" to={`/reports/${report.id}/edit`}>Edit</Link>}
+      <div className="print-header">
+        <Logo />
+        <div className="print-header-title">Employee Parking Daily Report — Port of Seattle</div>
       </div>
-      <p className="muted">Supervisor: {report.supervisor_name} · Status: {report.status} · Last modified {new Date(report.updated_at).toLocaleString()}</p>
+
+      <div className="page-header no-print">
+        <h2>Daily Report — {report.report_date} ({report.shift_name})</h2>
+        <div className="row-actions">
+          <button onClick={() => window.print()}>Print</button>
+          {report.canEdit && <Link className="button" to={`/reports/${report.id}/edit`}>Edit</Link>}
+        </div>
+      </div>
+      <h2 className="print-only-heading">Daily Report — {report.report_date} ({report.shift_name})</h2>
+      <p className="muted">
+        Supervisor: {report.supervisor_name} · Status: {report.status}
+        {report.submitted_at ? <> · Submitted {new Date(report.submitted_at).toLocaleString()}</> : null}
+        {' '}· Last edited {new Date(report.updated_at).toLocaleString()}
+      </p>
       <p className="muted">
         Incoming Supervisor(s): {report.incomingSupervisors.length ? report.incomingSupervisors.map((s) => s.user_name).join(', ') : '—'}
       </p>
@@ -126,7 +140,7 @@ export default function ReportView() {
           ))}
         </ul>
         {canComment && (
-          <form onSubmit={submitComment} className="comment-form">
+          <form onSubmit={submitComment} className="comment-form no-print">
             <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="Add a comment…" />
             {error && <div className="error-text">{error}</div>}
             <button type="submit">Save Comment</button>

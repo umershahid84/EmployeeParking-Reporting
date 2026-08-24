@@ -39,7 +39,7 @@ function dataTable(headers, rows) {
  * Renders a full Daily Report as a self-contained, email-client-safe HTML
  * document (table-based layout, inline styles, no external assets).
  */
-function renderReportEmailHtml(report, { viewUrl } = {}) {
+function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
   const incoming = report.incomingSupervisors?.length
     ? report.incomingSupervisors.map((s) => esc(s.user_name)).join(', ')
     : 'Not specified';
@@ -78,6 +78,7 @@ function renderReportEmailHtml(report, { viewUrl } = {}) {
       <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid ${BORDER};border-radius:8px;overflow:hidden;">
         <tr>
           <td style="background:${BRAND_BLUE};padding:20px 28px;">
+            ${logoCid ? `<img src="cid:${esc(logoCid)}" alt="Port of Seattle" height="28" style="display:block;margin-bottom:10px;">` : ''}
             <div style="font:700 18px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#ffffff;">Employee Parking Daily Report</div>
             <div style="font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#cfe0f5;margin-top:2px;">Report Submitted</div>
           </td>
@@ -86,11 +87,7 @@ function renderReportEmailHtml(report, { viewUrl } = {}) {
           <td style="padding:24px 28px 8px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">Report ID</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">#${esc(report.id)}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Report Date</td>
+                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">Report Date</td>
                 <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(report.report_date)}</td>
               </tr>
               <tr>
@@ -109,6 +106,16 @@ function renderReportEmailHtml(report, { viewUrl } = {}) {
                 <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Status</td>
                 <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;text-transform:capitalize;">${esc(report.status)}</td>
               </tr>
+              ${report.submitted_at ? `
+              <tr>
+                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Submitted</td>
+                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(new Date(report.submitted_at).toLocaleString())}</td>
+              </tr>` : ''}
+              ${report.updated_at ? `
+              <tr>
+                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Last Edited</td>
+                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(new Date(report.updated_at).toLocaleString())}</td>
+              </tr>` : ''}
             </table>
           </td>
         </tr>
@@ -165,12 +172,13 @@ function renderReportEmailText(report, { viewUrl } = {}) {
   const lines = [
     'Employee Parking Daily Report - Report Submitted',
     '',
-    `Report ID: ${report.id}`,
     `Report Date: ${report.report_date}`,
     `Shift: ${report.shift_name}`,
     `Submitting Supervisor: ${report.supervisor_name}`,
     `Incoming Supervisor(s): ${incoming}`,
     `Status: ${report.status}`,
+    ...(report.submitted_at ? [`Submitted: ${new Date(report.submitted_at).toLocaleString()}`] : []),
+    ...(report.updated_at ? [`Last Edited: ${new Date(report.updated_at).toLocaleString()}`] : []),
     '',
     '--- Driver Call-Outs ---',
     ...(report.callouts?.length

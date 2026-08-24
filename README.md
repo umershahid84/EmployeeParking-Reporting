@@ -218,6 +218,41 @@ relay configured in `.env` (`EMAIL_*`). It expires after
 `PASSWORD_RESET_CODE_TTL_MINUTES` minutes, can only be used once, and is
 rate-limited against brute-force attempts.
 
+## Branding
+
+The app uses a dark navy color scheme (`client/src/styles.css`, all CSS
+custom properties on `:root`) with a Port of Seattle logo in the header on
+every page, on the login/password-reset pages, and on printed/PDF/emailed
+reports.
+
+To install the real logo, add the **same image file** at both of these
+paths (duplicated because the client and server are deployed/served
+independently):
+
+```
+client/public/port-of-seattle-logo.png
+server/src/assets/port-of-seattle-logo.png
+```
+
+A transparent-background PNG (or SVG) works best. Until the file is
+present, the app falls back to a plain "PORT OF SEATTLE" text badge
+everywhere the logo would go — nothing breaks, there's just no image yet.
+Once both files exist, `npm run build` + restart picks it up everywhere
+automatically: header, auth pages, browser print output, PDF exports
+(`GET /api/reports/export.pdf`, `GET /api/analytics/export.pdf`), and the
+daily-report-submission email.
+
+Printing (`window.print()` / "Save as PDF" from the browser) always
+renders on a light background regardless of the app's dark on-screen
+theme — the print stylesheet re-pins every color token to a light palette
+so printed pages stay readable and professional rather than inverting the
+dark theme onto paper.
+
+The internal database Report ID is never shown in the UI, printed reports,
+PDF exports, or emails — reports are identified to users by date, shift,
+and supervisor instead. It's still used internally for routing, database
+relationships, and audit history.
+
 ## Running continuously as a Linux service (systemd)
 
 See [`deploy/README.md`](deploy/README.md) for full instructions. Summary:

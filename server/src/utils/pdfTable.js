@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const { LOGO_PATH, logoExists } = require('./logo');
 
 const INK_PRIMARY = '#0b0b0b';
 const INK_SECONDARY = '#52514e';
@@ -21,6 +22,12 @@ function renderTablePdf(res, { filename, title, subtitle, columns, rows, landsca
   const right = doc.page.width - doc.page.margins.right;
   const bottom = doc.page.height - doc.page.margins.bottom;
   const colWidth = (right - left) / columns.length;
+
+  if (logoExists()) {
+    const logoTop = doc.y;
+    doc.image(LOGO_PATH, left, logoTop, { height: 34 });
+    doc.y = logoTop + 34 + 10;
+  }
 
   doc.fontSize(16).fillColor(INK_PRIMARY).text(title);
   if (subtitle) {

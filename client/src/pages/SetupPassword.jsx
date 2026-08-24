@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
+import Logo from '../components/Logo';
 
 export default function SetupPassword() {
   const [searchParams] = useSearchParams();
@@ -32,6 +33,7 @@ export default function SetupPassword() {
   if (!uid || !token) {
     return (
       <div className="auth-page">
+        <div className="auth-logo"><Logo /></div>
         <div className="auth-card">
           <h1>Set Your Password</h1>
           <p className="error-text">This link is missing required information. Please use the link from your account setup email.</p>
@@ -43,6 +45,7 @@ export default function SetupPassword() {
 
   return (
     <div className="auth-page">
+      <div className="auth-logo"><Logo /></div>
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Set Your Password</h1>
         <p>Welcome to the Employee Parking Reporting System. Choose a password to finish setting up your account.</p>

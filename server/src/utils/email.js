@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer');
 const { recordEmailLog } = require('./emailLog');
 const { renderReportEmailHtml, renderReportEmailText } = require('./reportEmailTemplate');
+const { LOGO_PATH, logoExists } = require('./logo');
+
+const LOGO_CID = 'port-of-seattle-logo';
 
 let transporter = null;
 
@@ -38,7 +41,7 @@ function appUrl() {
  * trail. Never throws - delivery failures are logged, not propagated,
  * so a broken mail relay can't block report submission or user creation.
  */
-async function sendMail({ to, subject, text, html, emailType, relatedEntity = null, relatedId = null }) {
+async function sendMail({ to, subject, text, html, attachments, emailType, relatedEntity = null, relatedId = null }) {
   if (!emailEnabled()) {
     console.log(`[email disabled] ${emailType} to ${to}: ${subject}`);
     await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'skipped', error: 'SEND_EMAILS is not "true"' });
@@ -47,7 +50,7 @@ async function sendMail({ to, subject, text, html, emailType, relatedEntity = nu
 
   const from = process.env.EMAIL_SENDER || process.env.EMAIL_USER || 'no-reply@example.com';
   try {
-    await getTransporter().sendMail({ from, to, subject, text, html });
+    await getTransporter().sendMail({ from, to, subject, text, html, attachments });
     await recordEmailLog({ emailType, recipientEmail: to, relatedEntity, relatedId, status: 'sent' });
   } catch (err) {
     console.error(`Failed to send ${emailType} email to ${to}:`, err);
@@ -120,7 +123,8 @@ async function sendAccountSetupEmail({ toEmail, name, setupToken, userId, isRese
  */
 async function sendReportSubmittedEmail({ toEmail, report }) {
   const viewUrl = `${appUrl()}/reports/${report.id}`;
-  const html = renderReportEmailHtml(report, { viewUrl });
+  const hasLogo = logoExists();
+  const html = renderReportEmailHtml(report, { viewUrl, logoCid: hasLogo ? LOGO_CID : null });
   const text = renderReportEmailText(report, { viewUrl });
 
   await sendMail({
@@ -128,6 +132,7 @@ async function sendReportSubmittedEmail({ toEmail, report }) {
     subject: `Daily Report Submitted - ${report.report_date} (${report.shift_name})`,
     text,
     html,
+    attachments: hasLogo ? [{ filename: 'port-of-seattle-logo.png', path: LOGO_PATH, cid: LOGO_CID }] : undefined,
     emailType: 'report_submitted',
     relatedEntity: 'daily_report',
     relatedId: report.id,

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { downloadFile } from '../utils/download';
+import Logo from '../components/Logo';
 
 export default function ReportsList() {
   const { user } = useAuth();
@@ -53,6 +54,11 @@ export default function ReportsList() {
 
   return (
     <div className="page">
+      <div className="print-header">
+        <Logo />
+        <div className="print-header-title">Employee Parking Daily Reports — Port of Seattle</div>
+      </div>
+
       <div className="page-header no-print">
         <h2>All Reports</h2>
         <div className="row-actions">

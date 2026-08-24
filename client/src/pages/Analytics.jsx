@@ -7,6 +7,7 @@ import {
 import api from '../api/client';
 import { METRIC_COLORS, METRIC_LABELS, CHART_INK, LOCATION_COLORS } from '../charts/colors';
 import { downloadFile } from '../utils/download';
+import Logo from '../components/Logo';
 
 const DATE_PRESETS = [
   { value: 'today', label: 'Today' },
@@ -168,6 +169,11 @@ export default function Analytics() {
 
   return (
     <div className="page">
+      <div className="print-header">
+        <Logo />
+        <div className="print-header-title">Employee Parking Analytics &amp; Trends — Port of Seattle</div>
+      </div>
+
       <div className="page-header no-print">
         <h2>Analytics &amp; Trends</h2>
         <div className="row-actions">
