@@ -51,10 +51,10 @@ function renderReportEmailHtml(report, { viewUrl } = {}) {
   ]);
 
   const coverageRows = (report.shiftCoverage || []).map((c) => [
-    esc(COVERAGE_LABELS[c.coverage_type] || c.coverage_type),
-    esc(c.shuttle_number || '—'),
     esc(c.driver_name || '—'),
+    esc(COVERAGE_LABELS[c.coverage_type] || c.coverage_type),
     esc(c.original_shuttle_number || '—'),
+    esc(c.shuttle_number || '—'),
     nl2br(c.notes || '—'),
   ]);
 
@@ -118,7 +118,7 @@ function renderReportEmailHtml(report, { viewUrl } = {}) {
             ${sectionTitle('Driver Call-Outs')}
             ${dataTable(['Shuttle/Bus #', 'Driver', 'Comments'], calloutRows)}
             ${sectionTitle('Shift Coverage')}
-            ${dataTable(['Coverage Type', 'Shuttle/Bus #', 'Driver', 'Moved From', 'Comments'], coverageRows)}
+            ${dataTable(['Driver', 'Moved From / OT', 'Moved From Shuttle #', 'To Cover Shuttle/Bus #', 'Comments'], coverageRows)}
             ${sectionTitle('Work Order Placed')}
             ${dataTable(['Location', 'Comments', 'Entered By', 'Date/Time'], workOrderRows)}
             ${notesRows.length ? sectionTitle('Shift Notes') : ''}

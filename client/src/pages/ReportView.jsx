@@ -71,14 +71,14 @@ export default function ReportView() {
         {report.shiftCoverage.length === 0 && <p className="muted">None reported.</p>}
         {report.shiftCoverage.length > 0 && (
           <table className="data-table">
-            <thead><tr><th>Coverage Type</th><th>Shuttle/Bus #</th><th>Driver</th><th>Moved From</th><th>Comments</th></tr></thead>
+            <thead><tr><th>Driver</th><th>Moved From / OT</th><th>Moved From Shuttle #</th><th>To Cover Shuttle/Bus #</th><th>Comments</th></tr></thead>
             <tbody>
               {report.shiftCoverage.map((c) => (
                 <tr key={c.id}>
-                  <td>{COVERAGE_LABELS[c.coverage_type] || c.coverage_type}</td>
-                  <td>{c.shuttle_number || '—'}</td>
                   <td>{c.driver_name || '—'}</td>
+                  <td>{COVERAGE_LABELS[c.coverage_type] || c.coverage_type}</td>
                   <td>{c.original_shuttle_number || '—'}</td>
+                  <td>{c.shuttle_number || '—'}</td>
                   <td>{c.notes || '—'}</td>
                 </tr>
               ))}

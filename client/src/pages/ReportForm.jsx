@@ -71,10 +71,9 @@ export default function ReportForm() {
     setter((rows) => rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
   }
 
-  function toggleIncomingSupervisor(supervisorId) {
-    setIncomingSupervisorIds((ids) => (
-      ids.includes(supervisorId) ? ids.filter((x) => x !== supervisorId) : [...ids, supervisorId]
-    ));
+  function handleIncomingSupervisorSelect(e) {
+    const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value);
+    setIncomingSupervisorIds(selected);
   }
 
   async function handleSubmit(e, status) {
@@ -126,18 +125,14 @@ export default function ReportForm() {
         <fieldset>
           <legend>Incoming Supervisor(s)</legend>
           {supervisors.length === 0 && <p className="muted">No active supervisor accounts found.</p>}
-          <div className="checkbox-list">
-            {supervisors.map((s) => (
-              <label key={s.id} className="checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={incomingSupervisorIds.includes(String(s.id))}
-                  onChange={() => toggleIncomingSupervisor(String(s.id))}
-                />
-                {s.name}
-              </label>
-            ))}
-          </div>
+          {supervisors.length > 0 && (
+            <label>
+              Select one or more (hold Ctrl/Cmd, or Shift for a range)
+              <select multiple value={incomingSupervisorIds} onChange={handleIncomingSupervisorSelect} size={Math.min(supervisors.length, 6)}>
+                {supervisors.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+              </select>
+            </label>
+          )}
         </fieldset>
 
         <fieldset>
@@ -163,17 +158,6 @@ export default function ReportForm() {
           <legend>Shift Coverage</legend>
           {shiftCoverage.map((c, i) => (
             <div className="row-editor coverage-row" key={i}>
-              <select value={c.coverageType} onChange={(e) => updateRow(setShiftCoverage, i, 'coverageType', e.target.value)}>
-                <option value="ot">Shift Covered with OT</option>
-                <option value="moved">Moved from Another Shuttle</option>
-                <option value="not_covered">Shift Not Covered for Bus Issues</option>
-              </select>
-
-              <select value={c.shuttleId} onChange={(e) => updateRow(setShiftCoverage, i, 'shuttleId', e.target.value)}>
-                <option value="">{c.coverageType === 'not_covered' ? 'Affected Shuttle/Bus #' : 'Shuttle #'}</option>
-                {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
-              </select>
-
               {c.coverageType !== 'not_covered' && (
                 <select value={c.driverId} onChange={(e) => updateRow(setShiftCoverage, i, 'driverId', e.target.value)}>
                   <option value="">Driver</option>
@@ -181,12 +165,23 @@ export default function ReportForm() {
                 </select>
               )}
 
+              <select value={c.coverageType} onChange={(e) => updateRow(setShiftCoverage, i, 'coverageType', e.target.value)}>
+                <option value="ot">Shift Covered with OT</option>
+                <option value="moved">Moved from Another Shuttle</option>
+                <option value="not_covered">Shift Not Covered for Bus Issues</option>
+              </select>
+
               {c.coverageType === 'moved' && (
                 <select value={c.originalShuttleId} onChange={(e) => updateRow(setShiftCoverage, i, 'originalShuttleId', e.target.value)}>
-                  <option value="">Moved from shuttle #</option>
+                  <option value="">Moved From: original shuttle #</option>
                   {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
                 </select>
               )}
+
+              <select value={c.shuttleId} onChange={(e) => updateRow(setShiftCoverage, i, 'shuttleId', e.target.value)}>
+                <option value="">To Cover Shuttle/Bus #</option>
+                {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
+              </select>
 
               <input placeholder="Comments" value={c.notes} onChange={(e) => updateRow(setShiftCoverage, i, 'notes', e.target.value)} />
               <button type="button" onClick={() => setShiftCoverage((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
