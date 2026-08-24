@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Logo from '../components/Logo';
+import AuthLayout from '../components/AuthLayout';
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,10 +26,8 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-logo"><Logo /></div>
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Employee Parking Reporting</h1>
+    <AuthLayout subtitle="Portal Login">
+      <form onSubmit={handleSubmit}>
         <label>Email / Username
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
         </label>
@@ -40,6 +38,6 @@ export default function Login() {
         <button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign In'}</button>
         <Link to="/forgot-password" className="link-muted">Forgot Password?</Link>
       </form>
-    </div>
+    </AuthLayout>
   );
 }

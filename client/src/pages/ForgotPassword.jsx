@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import Logo from '../components/Logo';
+import AuthLayout from '../components/AuthLayout';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -22,10 +22,8 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-logo"><Logo /></div>
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Forgot Password</h1>
+    <AuthLayout subtitle="Forgot Password">
+      <form onSubmit={handleSubmit}>
         <p>Enter your account email address. If it matches an account, we'll send a 6-digit verification code.</p>
         <label>Email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
@@ -34,6 +32,6 @@ export default function ForgotPassword() {
         <button type="submit" disabled={submitting}>{submitting ? 'Sending…' : 'Send Reset Code'}</button>
         <Link to="/login" className="link-muted">Back to Sign In</Link>
       </form>
-    </div>
+    </AuthLayout>
   );
 }

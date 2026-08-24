@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import Logo from '../components/Logo';
+import AuthLayout from '../components/AuthLayout';
 
 export default function ResetPassword() {
   const location = useLocation();
@@ -30,10 +30,8 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-logo"><Logo /></div>
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Reset Password</h1>
+    <AuthLayout subtitle="Reset Password">
+      <form onSubmit={handleSubmit}>
         <label>Email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </label>
@@ -51,6 +49,6 @@ export default function ResetPassword() {
         <button type="submit" disabled={submitting}>{submitting ? 'Resetting…' : 'Reset Password'}</button>
         <Link to="/login" className="link-muted">Back to Sign In</Link>
       </form>
-    </div>
+    </AuthLayout>
   );
 }

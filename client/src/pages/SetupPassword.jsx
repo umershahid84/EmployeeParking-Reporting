@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
-import Logo from '../components/Logo';
+import AuthLayout from '../components/AuthLayout';
 
 export default function SetupPassword() {
   const [searchParams] = useSearchParams();
@@ -32,22 +32,16 @@ export default function SetupPassword() {
 
   if (!uid || !token) {
     return (
-      <div className="auth-page">
-        <div className="auth-logo"><Logo /></div>
-        <div className="auth-card">
-          <h1>Set Your Password</h1>
-          <p className="error-text">This link is missing required information. Please use the link from your account setup email.</p>
-          <Link to="/login" className="link-muted">Back to Sign In</Link>
-        </div>
-      </div>
+      <AuthLayout subtitle="Set Your Password">
+        <p className="error-text">This link is missing required information. Please use the link from your account setup email.</p>
+        <Link to="/login" className="link-muted">Back to Sign In</Link>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-logo"><Logo /></div>
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Set Your Password</h1>
+    <AuthLayout subtitle="Set Your Password">
+      <form onSubmit={handleSubmit}>
         <p>Welcome to the Employee Parking Reporting System. Choose a password to finish setting up your account.</p>
         <label>New Password
           <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoFocus />
@@ -60,6 +54,6 @@ export default function SetupPassword() {
         <button type="submit" disabled={submitting}>{submitting ? 'Saving…' : 'Set Password'}</button>
         <Link to="/login" className="link-muted">Back to Sign In</Link>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
