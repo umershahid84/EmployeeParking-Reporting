@@ -38,7 +38,14 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .app-header .brand { display: flex; align-items: center; gap: 10px; margin-right: 12px; text-decoration: none; color: inherit; }
-.app-header .brand-logo { height: 36px; width: auto; display: block; }
+.app-header .brand-logo {
+  height: 36px;
+  width: auto;
+  display: block;
+  background: #fff;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
 .app-header .brand-logo-placeholder {
   height: 36px;
   padding: 0 10px;
@@ -113,7 +120,7 @@ button:hover { opacity: 0.85; }
 
 .auth-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 24px; padding: 24px; }
 .auth-logo { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.auth-logo img { height: 64px; width: auto; }
+.auth-logo img { height: 64px; width: auto; background: #fff; border-radius: 6px; padding: 10px 16px; }
 .auth-logo .brand-logo-placeholder { height: 64px; padding: 0 16px; font-size: 0.85rem; }
 .auth-card {
   background: var(--surface);

@@ -221,26 +221,29 @@ rate-limited against brute-force attempts.
 ## Branding
 
 The app uses a dark navy color scheme (`client/src/styles.css`, all CSS
-custom properties on `:root`) with a Port of Seattle logo in the header on
-every page, on the login/password-reset pages, and on printed/PDF/emailed
-reports.
+custom properties on `:root`) with the official Port of Seattle logo in the
+header on every page, on the login/password-reset pages, and on
+printed/PDF/emailed reports.
 
-To install the real logo, add the **same image file** at both of these
-paths (duplicated because the client and server are deployed/served
-independently):
+The logo ships in two forms, since the web app and the server-generated
+PDF/email output have different needs:
 
 ```
-client/public/port-of-seattle-logo.png
-server/src/assets/port-of-seattle-logo.png
+client/public/port-of-seattle-logo.svg     # web app - crisp vector, any size
+server/src/assets/port-of-seattle-logo.svg # source copy, kept for reference/re-rasterizing
+server/src/assets/port-of-seattle-logo.png # PDF export + email attachment (pdfkit and email clients need raster)
 ```
 
-A transparent-background PNG (or SVG) works best. Until the file is
-present, the app falls back to a plain "PORT OF SEATTLE" text badge
-everywhere the logo would go — nothing breaks, there's just no image yet.
-Once both files exist, `npm run build` + restart picks it up everywhere
-automatically: header, auth pages, browser print output, PDF exports
-(`GET /api/reports/export.pdf`, `GET /api/analytics/export.pdf`), and the
-daily-report-submission email.
+If the logo is ever replaced, update the `.svg` at both locations, then
+regenerate the `.png` from it (any SVG-to-PNG tool works — a transparent
+background at a few hundred pixels wide is plenty for the PDF/email use).
+If either server-side file is ever missing, the app falls back gracefully:
+PDF exports simply omit the logo and the email uses no attachment — nothing
+breaks. The client falls back to a plain "PORT OF SEATTLE" text badge if its
+SVG is missing. Once the files are in place, `npm run build` + restart picks
+them up everywhere automatically: header, auth pages, browser print output,
+PDF exports (`GET /api/reports/export.pdf`, `GET /api/analytics/export.pdf`),
+and the daily-report-submission email.
 
 Printing (`window.print()` / "Save as PDF" from the browser) always
 renders on a light background regardless of the app's dark on-screen
