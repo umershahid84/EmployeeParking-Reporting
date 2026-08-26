@@ -215,10 +215,16 @@ currently applied.
   `GET /api/analytics/export.csv` (per-report metric counts) stream a CSV
   built from the same filtered query as the on-screen data.
 - **Export PDF** — `GET /api/reports/export.pdf` renders the filtered report
-  list as a paginated table; `GET /api/analytics/export.pdf` renders the
-  overview totals plus the by-shift/by-supervisor/by-location/incoming-
-  supervisor breakdowns as a summary document. Both are generated
-  server-side with `pdfkit` (no headless browser dependency).
+  list as a paginated table; `GET /api/analytics/export.pdf` mirrors every
+  section of the on-screen dashboard in the same order - the colored KPI
+  tiles, trend line charts, by-shift/by-supervisor comparison bar charts,
+  shuttle/driver/location breakdown charts, the work-orders-by-location pie
+  chart, and the Driver Movement / Bus Issue detailed-analysis tables -
+  using the same color per metric as the dashboard, so **Export PDF** and
+  **Print** always produce the same report. Both are generated server-side
+  with `pdfkit` drawing vector shapes directly
+  (`server/src/utils/pdfCharts.js`) — no
+  headless browser dependency.
 - **Print** — a plain `window.print()` using a print stylesheet that hides
   navigation, filter controls, and action buttons, leaving just the table
   (Reports) or the stat tiles/charts/tables (Analytics).

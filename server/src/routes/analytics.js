@@ -4,6 +4,15 @@ const pool = require('../db/pool');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
 const { INK_PRIMARY, INK_SECONDARY, INK_MUTED, LINE } = require('../utils/pdfTable');
 const { LOGO_PATH, logoExists } = require('../utils/logo');
+const {
+  METRIC_COLORS,
+  LOCATION_COLORS,
+  drawStatTiles,
+  drawLineChart,
+  drawGroupedBarChart,
+  drawHorizontalBarChart,
+  drawPieChart,
+} = require('../utils/pdfCharts');
 
 const router = express.Router();
 
@@ -271,10 +280,71 @@ function describeAnalyticsFilters(query) {
   return parts.length ? parts.join(' · ') : 'All data';
 }
 
-// GET /api/analytics/export.pdf - a printable summary of the same
-// filter-driven analytics payload the dashboard renders.
+// Combines several {label, count} series into one row per fixed label, so
+// a grouped bar chart can plot every metric against the same category axis
+// (mirrors the client's mergeByFixedLabels in Analytics.jsx).
+function mergeByFixedLabels(labels, metricSeries) {
+  return labels.map((label) => {
+    const row = { label };
+    for (const [metricKey, arr] of Object.entries(metricSeries)) {
+      const match = arr.find((item) => item.label === label);
+      row[metricKey] = match ? Number(match.count) : 0;
+    }
+    return row;
+  });
+}
+
+// Same, but for an open-ended category axis (e.g. supervisors) - takes the
+// union of every label across the series, sorted by total descending
+// (mirrors the client's mergeByUnion in Analytics.jsx).
+function mergeByUnion(metricSeries, limit = 8) {
+  const map = new Map();
+  for (const [metricKey, arr] of Object.entries(metricSeries)) {
+    for (const item of arr) {
+      if (!map.has(item.label)) map.set(item.label, { label: item.label });
+      map.get(item.label)[metricKey] = Number(item.count);
+    }
+  }
+  const rows = Array.from(map.values()).map((row) => {
+    for (const metricKey of Object.keys(metricSeries)) {
+      if (row[metricKey] === undefined) row[metricKey] = 0;
+    }
+    return row;
+  });
+  rows.sort((a, b) => {
+    const totalA = Object.keys(metricSeries).reduce((sum, k) => sum + a[k], 0);
+    const totalB = Object.keys(metricSeries).reduce((sum, k) => sum + b[k], 0);
+    return totalB - totalA;
+  });
+  return rows.slice(0, limit);
+}
+
+const COMPARISON_SERIES_DEF = [
+  { key: 'callouts', label: 'Call-Outs', color: METRIC_COLORS.callouts },
+  { key: 'ot', label: 'Shift Covered with OT', color: METRIC_COLORS.ot },
+  { key: 'moved', label: 'Moved from Another Shuttle', color: METRIC_COLORS.moved },
+  { key: 'uncovered', label: 'Shift Not Covered (Bus Issue)', color: METRIC_COLORS.uncovered },
+  { key: 'workOrders', label: 'Work Orders', color: METRIC_COLORS.workOrders },
+];
+
+function toGroupedSeries(mergedRows) {
+  return {
+    categories: mergedRows.map((r) => r.label),
+    series: COMPARISON_SERIES_DEF.map((def) => ({
+      label: def.label,
+      color: def.color,
+      values: mergedRows.map((r) => r[def.key] || 0),
+    })),
+  };
+}
+
+// GET /api/analytics/export.pdf - a printable, charted summary of the same
+// filter-driven analytics payload the dashboard renders, so exported PDFs
+// carry the same colored trend/comparison/breakdown charts shown on screen.
 router.get('/export.pdf', async (req, res) => {
   const analytics = await computeAnalytics(req.query);
+  const [shiftRows] = await pool.query('SELECT name FROM shifts ORDER BY id');
+  const shiftNames = shiftRows.map((r) => r.name);
 
   const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
   res.setHeader('Content-Type', 'application/pdf');
@@ -284,6 +354,7 @@ router.get('/export.pdf', async (req, res) => {
   const left = doc.page.margins.left;
   const right = doc.page.width - doc.page.margins.right;
   const bottom = doc.page.height - doc.page.margins.bottom;
+  const contentWidth = right - left;
 
   function ensureSpace(height) {
     if (doc.y + height > bottom) doc.addPage();
@@ -291,24 +362,12 @@ router.get('/export.pdf', async (req, res) => {
 
   function heading(text) {
     ensureSpace(30);
-    doc.moveDown(0.6);
-    doc.fontSize(13).fillColor(INK_PRIMARY).text(text);
+    doc.x = left;
+    doc.y += 10;
+    doc.fontSize(13).fillColor(INK_PRIMARY).text(text, left, doc.y, { width: contentWidth });
     doc.moveTo(left, doc.y + 2).lineTo(right, doc.y + 2).strokeColor(LINE).stroke();
-    doc.moveDown(0.4);
-  }
-
-  function miniTable(rows, labelKey = 'label', countKey = 'count', limit = 12) {
-    if (!rows.length) {
-      doc.fontSize(9).fillColor(INK_MUTED).text('No data for the selected filters.');
-      return;
-    }
-    for (const row of rows.slice(0, limit)) {
-      ensureSpace(14);
-      const y = doc.y;
-      doc.fontSize(9).fillColor(INK_PRIMARY).text(String(row[labelKey] ?? '—'), left, y, { width: 340, continued: false });
-      doc.fontSize(9).fillColor(INK_SECONDARY).text(String(row[countKey] ?? 0), left + 350, y, { width: 80, align: 'right' });
-      doc.y = y + 14;
-    }
+    doc.y += 6;
+    doc.x = left;
   }
 
   if (logoExists()) {
@@ -317,49 +376,167 @@ router.get('/export.pdf', async (req, res) => {
     doc.y = logoTop + 34 + 10;
   }
 
-  doc.fontSize(18).fillColor(INK_PRIMARY).text('Employee Parking Analytics & Trends');
+  doc.fontSize(16).fillColor(INK_PRIMARY).text('Employee Parking Analytics & Trends', left, doc.y, { width: contentWidth });
   doc.moveDown(0.2);
-  doc.fontSize(9).fillColor(INK_SECONDARY).text(describeAnalyticsFilters(req.query));
-  doc.fontSize(8).fillColor(INK_MUTED).text(`Generated ${new Date().toLocaleString()}`);
+  doc.fontSize(9).fillColor(INK_SECONDARY).text(describeAnalyticsFilters(req.query), left, doc.y, { width: contentWidth });
+  doc.fontSize(8).fillColor(INK_MUTED).text(`Generated ${new Date().toLocaleString()}`, left, doc.y, { width: contentWidth });
 
+  // --- Overview: colored KPI tiles -----------------------------------
   heading('Overview');
   const totals = analytics.totals;
-  doc.fontSize(10).fillColor(INK_PRIMARY);
-  [
-    ['Total Reports', totals.reports],
-    ['Driver Call-Outs', totals.callouts],
-    ['OT Coverage', totals.otCoverage],
-    ['Driver Movements', totals.driverMovements],
-    ['Uncovered Shifts', totals.uncoveredShifts],
-    ['Work Orders', totals.workOrders],
-  ].forEach(([label, value]) => {
-    ensureSpace(14);
-    const y = doc.y;
-    doc.fontSize(9).fillColor(INK_PRIMARY).text(label, left, y, { width: 200 });
-    doc.fontSize(9).fillColor(INK_SECONDARY).text(String(value), left + 200, y, { width: 80, align: 'right' });
-    doc.y = y + 14;
+  const tiles = [
+    { label: 'Total Reports', value: totals.reports, color: METRIC_COLORS.reports },
+    { label: 'Driver Call-Outs', value: totals.callouts, color: METRIC_COLORS.callouts },
+    { label: 'OT Coverage', value: totals.otCoverage, color: METRIC_COLORS.ot },
+    { label: 'Driver Movements', value: totals.driverMovements, color: METRIC_COLORS.moved },
+    { label: 'Uncovered Shifts', value: totals.uncoveredShifts, color: METRIC_COLORS.uncovered },
+    { label: 'Work Orders', value: totals.workOrders, color: METRIC_COLORS.workOrders },
+  ];
+  ensureSpace(56 * 2 + 10);
+  doc.y = drawStatTiles(doc, { x: left, y: doc.y, width: contentWidth, tiles, columns: 3, tileHeight: 56 });
+
+  // --- Trends: one colored line chart per metric ----------------------
+  heading('Trends');
+  const trendCharts = [
+    { title: 'Driver Call-Out Trend', data: analytics.trend.callouts, color: METRIC_COLORS.callouts },
+    { title: 'OT Coverage Trend', data: analytics.trend.ot, color: METRIC_COLORS.ot },
+    { title: 'Driver Movement Trend', data: analytics.trend.moved, color: METRIC_COLORS.moved },
+    { title: 'Bus Issue Trend', data: analytics.trend.uncovered, color: METRIC_COLORS.uncovered },
+    { title: 'Work Order Trend', data: analytics.trend.workOrders, color: METRIC_COLORS.workOrders },
+    { title: 'Incoming Supervisor Handoffs', data: analytics.trend.incomingSupervisors, color: METRIC_COLORS.incomingSupervisors },
+  ];
+  const trendChartWidth = (contentWidth - 16) / 2;
+  const trendChartHeight = 95;
+  for (let i = 0; i < trendCharts.length; i += 2) {
+    ensureSpace(trendChartHeight + 14);
+    const rowY = doc.y;
+    drawLineChart(doc, { x: left, y: rowY, width: trendChartWidth, height: trendChartHeight, ...trendCharts[i] });
+    if (trendCharts[i + 1]) {
+      drawLineChart(doc, { x: left + trendChartWidth + 16, y: rowY, width: trendChartWidth, height: trendChartHeight, ...trendCharts[i + 1] });
+    }
+    doc.y = rowY + trendChartHeight + 14;
+  }
+
+  // --- Comparisons: colored grouped bar charts ------------------------
+  heading('Comparisons — By Shift');
+  const byShiftMerged = mergeByFixedLabels(shiftNames, {
+    callouts: analytics.byShift.callouts,
+    ot: analytics.byShift.ot,
+    moved: analytics.byShift.moved,
+    uncovered: analytics.byShift.uncovered,
+    workOrders: analytics.byShift.workOrders,
+  });
+  const byShiftChart = toGroupedSeries(byShiftMerged);
+  ensureSpace(160);
+  doc.y = drawGroupedBarChart(doc, { x: left, y: doc.y, width: contentWidth, height: 150, ...byShiftChart });
+
+  heading('Comparisons — By Supervisor');
+  const bySupervisorMerged = mergeByUnion({
+    callouts: analytics.bySupervisor.callouts,
+    ot: analytics.bySupervisor.ot,
+    moved: analytics.bySupervisor.moved,
+    uncovered: analytics.bySupervisor.uncovered,
+    workOrders: analytics.bySupervisor.workOrders,
+  });
+  const bySupervisorChart = toGroupedSeries(bySupervisorMerged);
+  ensureSpace(160);
+  doc.y = drawGroupedBarChart(doc, { x: left, y: doc.y, width: contentWidth, height: 150, ...bySupervisorChart });
+
+  // --- Breakdown charts: colored horizontal bar charts ----------------
+  heading('Breakdowns');
+  const breakdownCharts = [
+    { title: 'Call-Outs by Shuttle/Bus', data: analytics.byShuttle.callouts, color: METRIC_COLORS.callouts },
+    { title: 'Call-Outs by Driver', data: analytics.byDriver.callouts, color: METRIC_COLORS.callouts },
+    { title: 'Most Frequently Moved Drivers', data: analytics.byDriver.mostMoved, color: METRIC_COLORS.moved },
+    { title: 'Shuttles Most Needing OT Coverage', data: analytics.byShuttle.ot, color: METRIC_COLORS.ot },
+    { title: 'Shuttles Most Moved To/From', data: analytics.byShuttle.moved, color: METRIC_COLORS.moved },
+    { title: 'Shuttles with Uncovered Shifts', data: analytics.byShuttle.uncovered, color: METRIC_COLORS.uncovered },
+    { title: 'Incoming Supervisor Handoffs', data: analytics.incomingSupervisors, color: METRIC_COLORS.incomingSupervisors },
+  ];
+  const breakdownChartHeight = 6 * 14 + 20;
+  for (const chart of breakdownCharts) {
+    ensureSpace(breakdownChartHeight);
+    doc.y = drawHorizontalBarChart(doc, { x: left, y: doc.y, width: contentWidth, limit: 6, ...chart });
+    doc.moveDown(0.4);
+  }
+
+  // --- Work Orders by Location: colored pie chart ---------------------
+  heading('Work Orders by Location');
+  ensureSpace(90);
+  doc.y = drawPieChart(doc, {
+    x: left,
+    y: doc.y,
+    radius: 45,
+    data: analytics.byLocation.workOrders,
+    colors: LOCATION_COLORS,
   });
 
-  heading('Driver Call-Outs by Shift');
-  miniTable(analytics.byShift.callouts);
+  // --- Detailed Analysis: the same drill-down tables shown on screen -
+  function detailTable(columns, dataRows) {
+    const colWidth = contentWidth / columns.length;
 
-  heading('Driver Call-Outs by Supervisor');
-  miniTable(analytics.bySupervisor.callouts);
+    function drawHeaderRow() {
+      const y = doc.y;
+      doc.fontSize(8).fillColor(INK_PRIMARY);
+      columns.forEach((col, i) => doc.text(col.label, left + i * colWidth, y, { width: colWidth - 6 }));
+      doc.y = y + 12;
+      doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor(LINE).stroke();
+      doc.y += 3;
+      doc.x = left;
+    }
 
-  heading('Shift Covered with OT - by Shift');
-  miniTable(analytics.byShift.ot);
+    ensureSpace(30);
+    drawHeaderRow();
 
-  heading('Moved from Another Shuttle - by Shift');
-  miniTable(analytics.byShift.moved);
+    if (!dataRows.length) {
+      doc.fontSize(8).fillColor(INK_MUTED).text('No records for the selected filters.', left, doc.y, { width: contentWidth });
+      doc.x = left;
+      return;
+    }
 
-  heading('Shift Not Covered (Bus Issue) - by Shift');
-  miniTable(analytics.byShift.uncovered);
+    for (const row of dataRows) {
+      const cellTexts = columns.map((col) => String(row[col.key] ?? '—'));
+      const rowHeight = Math.max(...cellTexts.map((t) => doc.heightOfString(t, { width: colWidth - 6, fontSize: 8 })), 11);
 
-  heading('Work Orders by Location');
-  miniTable(analytics.byLocation.workOrders);
+      if (doc.y + rowHeight + 4 > bottom) {
+        doc.addPage();
+        doc.y = doc.page.margins.top;
+        drawHeaderRow();
+      }
 
-  heading('Incoming Supervisor Handoffs');
-  miniTable(analytics.incomingSupervisors);
+      const y = doc.y;
+      doc.fontSize(8).fillColor(INK_SECONDARY);
+      cellTexts.forEach((text, i) => doc.text(text, left + i * colWidth, y, { width: colWidth - 6 }));
+      doc.y = y + rowHeight + 4;
+      doc.x = left;
+    }
+  }
+
+  heading('Detailed Analysis — Driver Movement Details');
+  detailTable(
+    [
+      { key: 'report_date', label: 'Date' },
+      { key: 'shift_name', label: 'Shift' },
+      { key: 'supervisor_name', label: 'Supervisor' },
+      { key: 'driver_name', label: 'Driver' },
+      { key: 'original_shuttle_number', label: 'From Shuttle' },
+      { key: 'shuttle_number', label: 'To Shuttle' },
+      { key: 'notes', label: 'Comments' },
+    ],
+    analytics.driverMovementDetails
+  );
+
+  heading('Detailed Analysis — Bus Issue / Uncovered Shift Details');
+  detailTable(
+    [
+      { key: 'report_date', label: 'Date' },
+      { key: 'shift_name', label: 'Shift' },
+      { key: 'supervisor_name', label: 'Supervisor' },
+      { key: 'shuttle_number', label: 'Shuttle/Bus' },
+      { key: 'notes', label: 'Comments' },
+    ],
+    analytics.busIssueDetails
+  );
 
   doc.end();
 });
