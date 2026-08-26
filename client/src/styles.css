@@ -139,22 +139,27 @@ button:hover { opacity: 0.85; }
 }
 .auth-header .brand-logo { height: 40px; width: auto; background: #fff; border-radius: 5px; padding: 6px 10px; display: block; }
 .auth-header .brand-logo-placeholder { height: 40px; padding: 0 12px; font-size: 0.75rem; display: flex; align-items: center; border: 1px dashed var(--border); border-radius: 4px; color: var(--muted); }
-.auth-hero { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 22px; padding: 40px 24px; text-align: center; }
+.auth-hero { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: 1; gap: 26px; padding: 8vh 24px 40px; text-align: center; }
 .auth-hero-title { font-size: 2rem; margin: 0; letter-spacing: 0.02em; }
 .auth-hero-subtitle { font-size: 1.2rem; font-weight: 600; margin: 0; color: var(--muted); }
 .auth-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 36px 44px;
+  padding: 44px 52px;
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
   text-align: left;
 }
-.auth-card form { display: flex; flex-direction: column; gap: 4px; }
+.auth-card form { display: flex; flex-direction: column; gap: 18px; }
+.auth-card form label { margin-bottom: 0; }
+.auth-card input { padding: 11px 14px; font-size: 1rem; }
+.auth-card button[type="submit"] { padding: 12px 14px; font-size: 1rem; margin-top: 6px; }
 .link-muted { color: var(--blue); font-size: 0.85rem; margin-top: 10px; text-align: center; text-decoration: none; }
 
 .multiselect-dropdown { position: relative; }
