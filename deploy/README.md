@@ -108,6 +108,64 @@ migrate` stays safe to run on every deploy and brings an older database
 fully up to date. Skipping it after a release that changed the schema will
 surface as reports failing to save with a database column error.
 
+### Deploying an update without `git` (downloading a ZIP instead)
+
+If you download the code as a ZIP from GitHub and unzip it rather than
+using `git pull`, you still need to get that new code into the exact
+directory `systemd` runs from (`/opt/epreport` in this guide) — unzipping
+it somewhere else (e.g. your home directory) and starting/restarting the
+service does **not** pick it up; the service only ever looks at its
+configured `WorkingDirectory`.
+
+Before copying anything, check whether your unzipped copy has its own
+`.env` file:
+
+```bash
+ls -la /home/you/epreport/.env
+```
+
+- **No `.env` there** (the normal case — a GitHub ZIP never includes it,
+  since it's gitignored): the plain `cp -r` below is safe, since `cp`
+  only overwrites files that exist in the source; your real `/opt/epreport/.env`
+  is left untouched.
+- **There IS an `.env` there** (e.g. left over from earlier testing in
+  that folder): **do not blindly `cp -r`** — it will silently overwrite
+  your working `/opt/epreport/.env`, undoing `BASE_PATH`/`APP_URL`/
+  `TRUST_PROXY`/DB/email settings. Either delete that stale `.env` first,
+  or copy with `rsync` excluding it instead:
+  ```bash
+  sudo rsync -a --exclude='.env' /home/you/epreport/ /opt/epreport/
+  ```
+
+Either way, copying files is only half the update — dependencies and the
+built client also need refreshing, so run the full sequence every time
+(substitute your unzipped path for `/home/umer/epreport`):
+
+```bash
+sudo systemctl stop epreport
+sudo cp -r /home/umer/epreport/. /opt/epreport/   # (or the rsync version above)
+sudo chown -R epreport:epreport /opt/epreport
+cd /opt/epreport
+sudo -u epreport npm install
+sudo -u epreport npm run migrate
+sudo -u epreport npm run build
+sudo systemctl restart epreport
+sudo systemctl status epreport --no-pager
+```
+
+Then hard-refresh your browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) before
+checking that the update actually shows up — otherwise you may just be
+looking at a cached copy of the old JS bundle even though the server
+itself is fully up to date.
+
+**This whole process is easy to get half-right** (forgetting `npm
+install`/`npm run build`, copying from a stale folder, clobbering
+`.env`), which is exactly why the `git pull`-based flow above is
+recommended over manual ZIP downloads if at all possible - it makes
+"did I actually get the latest code" a single, unambiguous command
+(`git log -1 --oneline`) instead of something you have to reconstruct
+from memory.
+
 ## Deploying behind a VPN/reverse proxy (Apache, at a sub-path)
 
 If the app needs to live at a sub-path like `/epreport` behind Apache
