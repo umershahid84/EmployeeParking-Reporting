@@ -20,6 +20,21 @@ const auditRoutes = require('./routes/audit');
 
 const app = express();
 
+// When deployed behind a reverse proxy (e.g. Apache proxying /epreport to
+// this app), the proxy sets X-Forwarded-For to the real client IP - but
+// Express ignores that header by default (and express-rate-limit refuses
+// to start up if it sees the header with trust proxy still off, since
+// trusting it blindly would let a client spoof their own rate-limit
+// identity). TRUST_PROXY tells Express how many hops of proxy to trust:
+// set it to "1" when there's exactly one reverse proxy in front of the
+// app (the common case), or leave it unset to keep trusting nothing (the
+// right choice when the app is reachable directly, with no proxy).
+if (process.env.TRUST_PROXY) {
+  const value = process.env.TRUST_PROXY;
+  const numeric = Number(value);
+  app.set('trust proxy', Number.isInteger(numeric) && String(numeric) === value ? numeric : value);
+}
+
 // The built client is served from the same origin in production, so CSP's
 // default-src restrictions are relaxed only enough for that same-origin
 // bundle; cross-origin API access (e.g. a separate dev client) still goes

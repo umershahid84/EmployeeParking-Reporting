@@ -107,8 +107,15 @@ above) — Apache is simply forwarding `/epreport/*` requests to it: the app
 does not need to know it's behind a VPN or handle TLS itself, since Apache
 terminates that.
 
+Also set `TRUST_PROXY=1` in `.env` and restart. Without it, Express
+doesn't trust the `X-Forwarded-For` header Apache adds, and
+`express-rate-limit` (used on the login/password-reset endpoints) throws
+`ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` rather than silently trusting a
+header a direct, non-proxied client could otherwise spoof to fake their
+own rate-limit identity.
+
 To go back to serving from the domain root, remove (or comment out)
-`BASE_PATH` in `.env`, rebuild, and restart.
+`BASE_PATH` and `TRUST_PROXY` in `.env`, rebuild, and restart.
 
 ### Database name
 
