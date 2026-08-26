@@ -47,6 +47,24 @@ scripts directly.
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
+### Making the app reachable on the network, not just localhost
+
+The app listens on `HOST` (default `0.0.0.0`, i.e. every network interface)
+and `PORT` (default `4000`), so once it's started it's already reachable at
+the server's own address — e.g. `http://10.78.4.13:4000` — from any other
+machine on the network, not just `localhost` on the server itself. If it's
+still not reachable, check the server's firewall (`ufw`/`firewalld`/security
+group) allows inbound traffic on `PORT`.
+
+Separately, set `APP_URL` in `.env` to that same real address (e.g.
+`APP_URL=http://10.78.4.13:4000`). This is **not** about network binding —
+it's the URL the app stamps into links it emails out (account setup links,
+"view this report" links). Leaving `APP_URL` at its default
+`http://localhost:4000` means every emailed link resolves to "localhost" on
+whatever computer opens the email, not your server, so those links will
+never work for anyone. Restart the app after changing `HOST`, `PORT`, or
+`APP_URL`.
+
 ### Database name
 
 `DB_NAME` in `.env` sets the MariaDB database the app uses — it defaults to
