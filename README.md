@@ -73,6 +73,23 @@ app, on the port set by `PORT` in `.env` (default `4000`).
 `SEED_ADMIN_NAME` from `.env` (defaults shown in `.env.example`). Change the
 password immediately after first login.
 
+### Seeding sample daily reports
+
+For local development or demoing the Analytics dashboard with realistic
+volume, `npm run seed:reports` generates random Daily Reports (submitted,
+with call-outs, shift coverage, work orders, and incoming supervisors):
+
+```bash
+npm run seed:reports          # seeds 100 random reports (the default)
+npm run seed:reports -- 250   # or pass a count
+```
+
+It creates whatever sample supervisors, drivers, and shuttles are needed to
+support that volume (reusing what already exists instead of duplicating
+it), spreads the reports over the last 90 days, and is safe to run more
+than once — each run only adds new reports, it never touches existing data.
+Not intended for production use.
+
 ### Local development
 
 If you'd rather run the Vite dev server (hot reload) alongside the API

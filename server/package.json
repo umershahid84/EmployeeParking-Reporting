@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "seed:reports": "node scripts/seedReports.js",
     "migrate": "node scripts/migrate.js"
   },
   "dependencies": {
