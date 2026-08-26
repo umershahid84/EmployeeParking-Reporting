@@ -69,53 +69,170 @@ never work for anyone. Restart the app after changing `HOST`, `PORT`, or
 
 To make the app available through an existing Apache server (e.g. a VPN
 portal) at a sub-path like `https://vpn.example.com/epreport` instead of
-its own dedicated port, set two things in `.env`:
+its own dedicated port, three settings in `.env` all need to be set
+together — **all three, every time**, not just `BASE_PATH`:
 
 ```bash
 BASE_PATH=/epreport
 APP_URL=https://vpn.example.com/epreport
+TRUST_PROXY=1
 ```
 
-`BASE_PATH` is baked into the built client (asset URLs, client-side
-routing) and read by the server at startup to mount the whole app —
-static files and every `/api/*` route — under that same prefix, so both
-sides agree on where the app lives. **Rebuild after changing it:**
-
-```bash
-npm run build
-sudo systemctl restart epreport   # or however you run the app
-```
+- **`BASE_PATH`** is baked into the built client (asset URLs, client-side
+  routing) and read by the server at startup to mount the whole app —
+  static files and every `/api/*` route — under that same prefix, so both
+  sides agree on where the app lives. **Rebuild after changing it** — it's
+  compiled into the JS/HTML, not read at runtime:
+  ```bash
+  npm run build
+  sudo systemctl restart epreport
+  ```
+- **`APP_URL`** must be the exact address a real user's browser uses to
+  reach the app — same scheme (`http` vs `https`), same host, same
+  sub-path. This is what gets stamped into every link the app emails out
+  (account setup, password reset, "view this report"). Get any part of
+  it wrong and the app will otherwise seem to work fine (you can browse
+  it), while every emailed link silently 404s or times out for
+  everyone — see the troubleshooting checklist below, this is the single
+  most common thing to get wrong in this whole setup.
+- **`TRUST_PROXY=1`** tells Express to trust the `X-Forwarded-For` header
+  Apache adds. **This one is not optional and not just cosmetic:**
+  without it, `express-rate-limit` (used on login/password-reset)
+  throws inside an unhandled async rejection the moment a proxied
+  request hits a rate-limited endpoint, which **crashes the entire
+  Node process**, not just that request — systemd then restarts it a
+  few seconds later, so the app appears to be randomly, intermittently
+  unreachable. If you only remember one thing from this section, make
+  it this one.
 
 On the Apache side, enable the proxy modules if they aren't already
 (`sudo a2enmod proxy proxy_http` on Debian/Ubuntu, or the equivalent
 `LoadModule proxy_module` / `proxy_http_module` lines on other
-distributions), then add this to the relevant `<VirtualHost>` block —
-substitute the app server's real address if Apache and the app aren't on
-the same machine:
+distributions, already on by default on many RHEL/Rocky installs), then
+add this to the relevant `<VirtualHost>` block:
 
 ```apache
-<Location /epreport>
-    ProxyPreserveHost On
-    ProxyPass http://10.78.4.13:4000/epreport
-    ProxyPassReverse http://10.78.4.13:4000/epreport
-</Location>
+ProxyPass /epreport/ "http://10.78.4.13:9000/epreport/"
+ProxyPassReverse /epreport/ "http://10.78.4.13:9000/epreport/"
 ```
 
-Reload Apache (`sudo systemctl reload apache2` / `httpd`) after adding
-this. The app itself keeps listening on `HOST`/`PORT` as before (see
-above) — Apache is simply forwarding `/epreport/*` requests to it: the app
-does not need to know it's behind a VPN or handle TLS itself, since Apache
-terminates that.
+Substitute the app server's real address and port. **Critically: figure
+out which machine actually terminates the connection your users'
+browsers make** — on a VPN, that is very often a *different box* from
+the one running this app (e.g. users hit `vpn.example.com`, which is a
+separate gateway/reverse-proxy machine that then forwards to the app
+server's internal IP). If so, this `ProxyPass` block belongs in *that*
+gateway machine's Apache config, not the app server's — adding it to the
+wrong machine's config is a real trap: the app will still be reachable
+by IP:port directly, giving no obvious sign that the actual public entry
+point was never configured at all.
 
-Also set `TRUST_PROXY=1` in `.env` and restart. Without it, Express
-doesn't trust the `X-Forwarded-For` header Apache adds, and
-`express-rate-limit` (used on the login/password-reset endpoints) throws
-`ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` rather than silently trusting a
-header a direct, non-proxied client could otherwise spoof to fake their
-own rate-limit identity.
+Reload Apache (`sudo systemctl reload apache2` / `httpd`) after adding
+this — always run `apachectl configtest` first and confirm "Syntax OK"
+before reloading; a config with a mistake in it just keeps the last-known-good
+config running silently, which looks identical to "my change didn't do
+anything." The app itself keeps listening on `HOST`/`PORT` as before —
+Apache is simply forwarding requests to it; the app does not need to
+handle TLS itself, since Apache/the gateway terminates that.
 
 To go back to serving from the domain root, remove (or comment out)
-`BASE_PATH` and `TRUST_PROXY` in `.env`, rebuild, and restart.
+`BASE_PATH`, `APP_URL`'s sub-path, and `TRUST_PROXY` in `.env`, rebuild,
+and restart.
+
+#### Troubleshooting checklist
+
+Work through these in order — each rules out one layer before moving to
+the next:
+
+1. **Is the app itself even running?**
+   ```bash
+   sudo systemctl status epreport --no-pager
+   sudo journalctl -u epreport -n 50 --no-pager
+   ```
+   Look for a crash loop (`Scheduled restart job, restart counter is at N`
+   climbing) — if you see `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` in the log,
+   that's the `TRUST_PROXY` issue above; add it and restart before
+   anything else.
+
+2. **Does `systemd`'s service file actually point at where your code
+   lives?** A generic "Failed to load environment files: No such file or
+   directory" / "resources" failure almost always means
+   `WorkingDirectory`/`EnvironmentFile`/`User` in
+   `/etc/systemd/system/epreport.service` don't match your real deploy
+   path:
+   ```bash
+   cat /etc/systemd/system/epreport.service | grep -E 'WorkingDirectory|EnvironmentFile|User='
+   ls -la <that WorkingDirectory>/.env
+   ```
+   **Keep exactly one canonical deployment directory.** If you copy the
+   app to a second location while debugging (e.g. from `/home/you/app` to
+   `/opt/epreport`) and keep editing the original, the two will silently
+   drift apart — systemd will keep running the stale copy's `.env` and
+   build while you keep changing the one that isn't actually live. Pick
+   one path, update the service file to match it, and only ever edit
+   `.env`/rebuild there.
+
+3. **On SELinux-enforcing distros (Rocky/RHEL/CentOS/Fedora), avoid
+   deploying under a user's home directory.** systemd services run in
+   the `init_t` domain, which the default targeted policy does not allow
+   to read files labeled `user_home_t` (i.e. anything under `/home/*`),
+   regardless of Unix file permissions looking correct. This surfaces as
+   the same generic "resources"/"No such file or directory" failure as
+   above even when the path and permissions are actually right. Check:
+   ```bash
+   getenforce
+   sudo ausearch -m avc -ts recent   # look for "denied" lines naming your .env or app path
+   ```
+   If you see `avc: denied` referencing your app's path: either move the
+   deployment to `/opt/epreport` (matches the default service file and
+   the policy's expectations — the simplest fix), or relabel the path
+   you want to keep using:
+   ```bash
+   sudo semanage fcontext -a -t bin_t "/home/you/epreport(/.*)?"
+   sudo restorecon -Rv /home/you/epreport
+   ```
+
+4. **Confirm the built assets actually have `BASE_PATH` baked in** — a
+   stale build (from before `BASE_PATH` was set, or a rebuild that ran
+   against the wrong copy per #2 above) serves a blank page, because the
+   HTML references `/assets/...` instead of `/epreport/assets/...`, and
+   nothing outside `/epreport/*` is proxied:
+   ```bash
+   grep -o 'src="[^"]*"' <WorkingDirectory>/client/dist/index.html
+   ```
+   Should show `/epreport/assets/...`, not `/assets/...`. If it doesn't,
+   `BASE_PATH` wasn't set in `.env` *at the time you last ran*
+   `npm run build` in that directory — fix `.env` and rebuild again.
+
+5. **Test each hop separately, from the right machine, with the right
+   scheme** — the most common mistake in this whole checklist is testing
+   the wrong thing and drawing the wrong conclusion from it:
+   ```bash
+   # From the app server itself - confirms the app/BASE_PATH/systemd side:
+   curl -s http://localhost:<PORT>/epreport/api/health
+
+   # From a workstation on the actual client network - confirms the
+   # proxy/gateway side. Use the SAME scheme (http/https) your users'
+   # browsers actually use - browsers silently upgrade http-to-https via
+   # HSTS/redirects often enough that "it works in my browser" doesn't
+   # prove the http:// URL you emailed actually resolves to anything:
+   curl -v https://vpn.example.com/epreport/api/health
+   ```
+   Both should return `{"ok":true}`. `curl`ing the gateway's address
+   *from the app server itself* usually proves nothing (`No route to
+   host` there is often just normal network segmentation between the
+   two boxes) - always test the gateway from a client machine.
+
+6. **Does `APP_URL` exactly match what #5 just proved works?** Whatever
+   URL/scheme you confirmed reaches the app from a real client machine in
+   step 5 is what `APP_URL` must be, byte for byte (`http` vs `https`
+   included). Mismatch here is invisible until someone clicks an emailed
+   link and it hangs or 404s — the app itself works fine the whole time,
+   which is what makes this particular bug so easy to miss:
+   ```bash
+   grep '^APP_URL' .env
+   sudo systemctl restart epreport   # runtime setting - no rebuild needed
+   ```
 
 ### Database name
 

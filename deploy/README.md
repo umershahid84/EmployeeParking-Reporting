@@ -4,6 +4,25 @@ These steps assume a Linux host with Node.js and MariaDB already installed,
 and that you're deploying the app to `/opt/epreport` (adjust paths in
 `epreport.service` if you use a different location).
 
+**Deploy to exactly one directory and never move it later.** Copying the
+app to a second location partway through setup (e.g. from your home
+directory to `/opt/epreport` while troubleshooting) is the single most
+common source of confusing, hard-to-diagnose failures: the two copies
+silently drift apart (different `.env`, different build), and whichever
+one `systemd`'s `WorkingDirectory`/`EnvironmentFile` actually points at
+is the one that's live — not necessarily the one you're still editing.
+If you do need to relocate, update `epreport.service` immediately and
+delete the old copy so there's no ambiguity about which is real.
+
+**On SELinux-enforcing distros (Rocky/RHEL/CentOS/Fedora — check with
+`getenforce`), deploy under `/opt`, not a user's home directory.**
+systemd services run in a domain that the default policy does not allow
+to read files under `/home/*` (labeled `user_home_t`), regardless of
+correct Unix permissions — this fails with a generic
+"resources"/"No such file or directory" error that looks identical to a
+wrong path or a missing `.env`. `/opt/epreport` (as used throughout this
+guide) avoids the issue entirely.
+
 ## 1. Get the code and build it
 
 ```bash
@@ -88,3 +107,12 @@ EXISTS` alongside the `CREATE TABLE` statements, specifically so `npm run
 migrate` stays safe to run on every deploy and brings an older database
 fully up to date. Skipping it after a release that changed the schema will
 surface as reports failing to save with a database column error.
+
+## Deploying behind a VPN/reverse proxy (Apache, at a sub-path)
+
+If the app needs to live at a sub-path like `/epreport` behind Apache
+(e.g. a VPN portal) rather than its own dedicated port, see the main
+README's ["Reverse proxy under a sub-path (Apache)"](../README.md#reverse-proxy-under-a-sub-path-apache)
+section — it covers the three `.env` settings that all need to be set
+together (`BASE_PATH`, `APP_URL`, `TRUST_PROXY`), the Apache config, and
+a step-by-step troubleshooting checklist for exactly this kind of setup.
