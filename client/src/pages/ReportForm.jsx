@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 
 const emptyCallout = () => ({ shuttleId: '', driverId: '', notes: '' });
 const emptyCoverage = () => ({ coverageType: 'ot', shuttleId: '', driverId: '', originalShuttleId: '', notes: '' });
@@ -71,11 +72,6 @@ export default function ReportForm() {
     setter((rows) => rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
   }
 
-  function handleIncomingSupervisorSelect(e) {
-    const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value);
-    setIncomingSupervisorIds(selected);
-  }
-
   async function handleSubmit(e, status) {
     e.preventDefault();
     setError('');
@@ -124,15 +120,13 @@ export default function ReportForm() {
 
         <fieldset>
           <legend>Incoming Supervisor(s)</legend>
-          {supervisors.length === 0 && <p className="muted">No active supervisor accounts found.</p>}
-          {supervisors.length > 0 && (
-            <label>
-              Select one or more (hold Ctrl/Cmd, or Shift for a range)
-              <select multiple value={incomingSupervisorIds} onChange={handleIncomingSupervisorSelect} size={Math.min(supervisors.length, 6)}>
-                {supervisors.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-              </select>
-            </label>
-          )}
+          <MultiSelectDropdown
+            options={supervisors.map((s) => ({ id: s.id, label: s.name }))}
+            selectedIds={incomingSupervisorIds}
+            onChange={setIncomingSupervisorIds}
+            placeholder="Select incoming supervisor(s)…"
+            emptyText="No active supervisor accounts found."
+          />
         </fieldset>
 
         <fieldset>

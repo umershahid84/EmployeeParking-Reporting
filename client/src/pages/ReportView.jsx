@@ -56,14 +56,20 @@ export default function ReportView() {
         </div>
       </div>
       <h2 className="print-only-heading">Daily Report — {report.report_date} ({report.shift_name})</h2>
-      <p className="muted">
-        Supervisor: {report.supervisor_name} · Status: {report.status}
-        {report.submitted_at ? <> · Submitted {new Date(report.submitted_at).toLocaleString()}</> : null}
-        {' '}· Last edited {new Date(report.updated_at).toLocaleString()}
-      </p>
-      <p className="muted">
-        Incoming Supervisor(s): {report.incomingSupervisors.length ? report.incomingSupervisors.map((s) => s.user_name).join(', ') : '—'}
-      </p>
+
+      <section className="report-summary">
+        <table className="report-summary-table">
+          <tbody>
+            <tr><td className="label">Report Date</td><td>{report.report_date}</td></tr>
+            <tr><td className="label">Shift</td><td>{report.shift_name}</td></tr>
+            <tr><td className="label">Submitting Supervisor</td><td>{report.supervisor_name}</td></tr>
+            <tr><td className="label">Incoming Supervisor(s)</td><td>{report.incomingSupervisors.length ? report.incomingSupervisors.map((s) => s.user_name).join(', ') : '—'}</td></tr>
+            <tr><td className="label">Status</td><td>{report.status}</td></tr>
+            {report.submitted_at && <tr><td className="label">Submitted</td><td>{new Date(report.submitted_at).toLocaleString()}</td></tr>}
+            <tr><td className="label">Last Edited</td><td>{new Date(report.updated_at).toLocaleString()}</td></tr>
+          </tbody>
+        </table>
+      </section>
 
       <section className="card">
         <h3>Driver Call-Outs</h3>
