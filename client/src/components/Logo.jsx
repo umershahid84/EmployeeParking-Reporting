@@ -13,7 +13,7 @@ export default function Logo({ className = 'brand-logo', placeholderClassName = 
 
   return (
     <img
-      src="/port-of-seattle-logo.svg"
+      src={`${import.meta.env.BASE_URL}port-of-seattle-logo.svg`}
       alt="Port of Seattle"
       className={className}
       onError={() => setFailed(true)}

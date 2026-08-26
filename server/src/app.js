@@ -29,32 +29,46 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Everything below is mounted under BASE_PATH so the whole app can be
+// reverse-proxied at a sub-path (e.g. Apache proxying /epreport straight
+// through to this server) instead of only ever living at the domain root.
+// Leave BASE_PATH unset (or "/") to serve from the root as before - that's
+// the default and requires no Apache/BASE_PATH changes at all.
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
+const router = express.Router();
 
-app.use('/api/auth', authRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/shuttles', shuttleRoutes);
-app.use('/api/shifts', shiftRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/supervisors', supervisorRoutes);
-app.use('/api/email-recipients', emailRecipientRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/audit', auditRoutes);
+router.get('/api/health', (req, res) => res.json({ ok: true }));
+
+router.use('/api/auth', authRoutes);
+router.use('/api/reports', reportRoutes);
+router.use('/api/drivers', driverRoutes);
+router.use('/api/shuttles', shuttleRoutes);
+router.use('/api/shifts', shiftRoutes);
+router.use('/api/users', userRoutes);
+router.use('/api/supervisors', supervisorRoutes);
+router.use('/api/email-recipients', emailRecipientRoutes);
+router.use('/api/analytics', analyticsRoutes);
+router.use('/api/audit', auditRoutes);
 
 // Any /api/* request that didn't match a route above is a genuine 404,
 // not a client-side route to hand off to the SPA.
-app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
+router.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 
 // Serve the built React client (client/dist) as one application. In a dev
 // environment where the client hasn't been built yet (e.g. `vite dev` is
 // used instead), this block is simply skipped.
 const clientDistPath = path.resolve(__dirname, '..', '..', 'client', 'dist');
 if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
-  app.get('*', (req, res) => {
+  router.use(express.static(clientDistPath));
+  router.get('*', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
+}
+
+if (BASE_PATH) {
+  app.use(BASE_PATH, router);
+} else {
+  app.use(router);
 }
 
 // Centralized error handler

@@ -65,6 +65,51 @@ whatever computer opens the email, not your server, so those links will
 never work for anyone. Restart the app after changing `HOST`, `PORT`, or
 `APP_URL`.
 
+### Reverse proxy under a sub-path (Apache)
+
+To make the app available through an existing Apache server (e.g. a VPN
+portal) at a sub-path like `https://vpn.example.com/epreport` instead of
+its own dedicated port, set two things in `.env`:
+
+```bash
+BASE_PATH=/epreport
+APP_URL=https://vpn.example.com/epreport
+```
+
+`BASE_PATH` is baked into the built client (asset URLs, client-side
+routing) and read by the server at startup to mount the whole app —
+static files and every `/api/*` route — under that same prefix, so both
+sides agree on where the app lives. **Rebuild after changing it:**
+
+```bash
+npm run build
+sudo systemctl restart epreport   # or however you run the app
+```
+
+On the Apache side, enable the proxy modules if they aren't already
+(`sudo a2enmod proxy proxy_http` on Debian/Ubuntu, or the equivalent
+`LoadModule proxy_module` / `proxy_http_module` lines on other
+distributions), then add this to the relevant `<VirtualHost>` block —
+substitute the app server's real address if Apache and the app aren't on
+the same machine:
+
+```apache
+<Location /epreport>
+    ProxyPreserveHost On
+    ProxyPass http://10.78.4.13:4000/epreport
+    ProxyPassReverse http://10.78.4.13:4000/epreport
+</Location>
+```
+
+Reload Apache (`sudo systemctl reload apache2` / `httpd`) after adding
+this. The app itself keeps listening on `HOST`/`PORT` as before (see
+above) — Apache is simply forwarding `/epreport/*` requests to it: the app
+does not need to know it's behind a VPN or handle TLS itself, since Apache
+terminates that.
+
+To go back to serving from the domain root, remove (or comment out)
+`BASE_PATH` in `.env`, rebuild, and restart.
+
 ### Database name
 
 `DB_NAME` in `.env` sets the MariaDB database the app uses — it defaults to
