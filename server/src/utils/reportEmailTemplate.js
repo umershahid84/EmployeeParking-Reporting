@@ -72,10 +72,10 @@ function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
   ].filter(([, v]) => v && String(v).trim());
 
   return `
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;">
   <tr>
-    <td align="center">
-      <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid ${BORDER};border-radius:8px;overflow:hidden;">
+    <td align="center" style="padding:24px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border:1px solid ${BORDER};border-radius:8px;overflow:hidden;">
         <tr>
           <td style="background:${BRAND_BLUE};padding:20px 28px;">
             ${logoCid ? `<img src="cid:${esc(logoCid)}" alt="Port of Seattle" height="28" style="display:block;margin-bottom:10px;">` : ''}
