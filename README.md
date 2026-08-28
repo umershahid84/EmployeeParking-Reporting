@@ -48,6 +48,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
 ### Follow these steps to copy into /opt/epreport/ folder for the application to run on VPN using apache
+```bash
 `sudo systemctl stop epreport
 `sudo cp -r /home/umer/epreport/. /opt/epreport/   # (or the rsync version above)
 `sudo chown -R epreport:epreport /opt/epreport
