@@ -47,6 +47,16 @@ scripts directly.
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
+### Follow these steps to copy into /opt/epreport/ folder for the application to run on VPN using apache
+'sudo systemctl stop epreport
+'sudo cp -r /home/umer/epreport/. /opt/epreport/   # (or the rsync version above)
+'sudo chown -R epreport:epreport /opt/epreport
+'cd /opt/epreport
+'sudo -u epreport npm install
+'sudo -u epreport npm run migrate
+'sudo -u epreport npm run build
+'sudo systemctl restart epreport
+'sudo systemctl status epreport --no-pager
 ### Making the app reachable on the network, not just localhost
 
 The app listens on `HOST` (default `0.0.0.0`, i.e. every network interface)
