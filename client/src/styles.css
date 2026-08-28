@@ -64,7 +64,17 @@ body {
 .app-header nav a:hover { color: var(--blue-dark); }
 .app-header .user-info { color: #1f2933; }
 .user-info { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
-.user-info button { background: transparent; border: 1px solid #c7ccd4; color: #1f2933; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.user-info button {
+  background: #ffffff;
+  border: 1px solid #c7ccd4;
+  color: #1f2933;
+  padding: 4px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.user-info button:hover:not(:disabled) { background: #eef1f6; border-color: #9aa3b0; }
 
 .app-main { flex: 1; padding: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
 
@@ -106,29 +116,60 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 input:disabled, select:disabled, textarea:disabled { opacity: 0.7; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
 
+/* Embossed, rounded button look: a subtle top-to-bottom gradient plus an
+   inset highlight/shadow pair to read as slightly raised, a real color
+   shift (not just opacity) on hover, and a pressed-in inset shadow on
+   click for tactile feedback. */
 button {
   cursor: pointer;
   border: 1px solid var(--input-border);
-  background: var(--surface-2);
+  background: linear-gradient(180deg, var(--surface-2), var(--input-bg));
   color: var(--text);
-  padding: 8px 14px;
-  border-radius: 5px;
+  padding: 8px 16px;
+  border-radius: 10px;
   font: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
 }
-button.primary, button[type="submit"] { background: var(--blue-dark); border-color: var(--blue-dark); color: white; }
-button:hover { opacity: 0.85; }
+button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #253358, #1c2a47);
+  border-color: var(--blue);
+}
+button:active:not(:disabled) {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px);
+}
+button:disabled { cursor: not-allowed; opacity: 0.6; }
+
+button.primary, button[type="submit"] {
+  background: linear-gradient(180deg, #5a9bf8, var(--blue-dark));
+  border-color: var(--blue-dark);
+  color: white;
+}
+button.primary:hover:not(:disabled), button[type="submit"]:hover:not(:disabled) {
+  background: linear-gradient(180deg, #6ea8ff, #244fac);
+  border-color: #6ea8ff;
+}
 
 .button {
   display: inline-block;
   text-decoration: none;
   border: 1px solid var(--blue-dark);
-  background: var(--blue-dark);
+  background: linear-gradient(180deg, #5a9bf8, var(--blue-dark));
   color: white;
-  padding: 8px 14px;
-  border-radius: 5px;
+  padding: 8px 16px;
+  border-radius: 10px;
   font-size: 0.9rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.button.secondary { background: var(--surface-2); color: var(--text); border-color: var(--input-border); }
+.button:hover { background: linear-gradient(180deg, #6ea8ff, #244fac); border-color: #6ea8ff; }
+.button.secondary {
+  background: linear-gradient(180deg, var(--surface-2), var(--input-bg));
+  color: var(--text);
+  border-color: var(--input-border);
+}
+.button.secondary:hover { background: linear-gradient(180deg, #253358, #1c2a47); border-color: var(--blue); }
 
 .auth-page { display: flex; flex-direction: column; min-height: 100vh; }
 .auth-header {
@@ -219,6 +260,37 @@ legend { font-weight: 700; padding: 0 6px; }
 .checkbox-list { display: flex; flex-wrap: wrap; gap: 12px 20px; }
 .checkbox-item { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; margin-bottom: 0; }
 .checkbox-item input { width: auto; }
+
+.toggle-row { flex-direction: row; align-items: center; gap: 10px; font-weight: 400; margin-bottom: 0; cursor: pointer; }
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--input-border);
+  border-radius: 999px;
+  background: var(--input-bg);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.toggle-switch.is-on { background: var(--blue-dark); border-color: var(--blue-dark); }
+.toggle-switch:hover:not(:disabled) { background: var(--input-bg); border-color: var(--blue); }
+.toggle-switch.is-on:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
+.toggle-switch:active:not(:disabled) { transform: none; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); }
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+.toggle-switch.is-on .toggle-thumb { transform: translateX(18px); }
 
 .form-actions { display: flex; gap: 12px; margin-top: 10px; }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
+import Toggle from '../components/Toggle';
 
 // Save Credentials is deliberately app-managed (localStorage), not left to
 // the browser's own password-save prompt, since that's invisible/optional
@@ -91,10 +92,7 @@ export default function Login() {
             required
           />
         </label>
-        <label className="checkbox-item">
-          <input type="checkbox" checked={saveCredentials} onChange={(e) => setSaveCredentials(e.target.checked)} />
-          Save Credentials
-        </label>
+        <Toggle checked={saveCredentials} onChange={setSaveCredentials} label="Save Credentials" />
         {error && <div className="error-text">{error}</div>}
         <button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign In'}</button>
         <Link to="/forgot-password" className="link-muted">Forgot Password?</Link>
