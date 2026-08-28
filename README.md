@@ -58,6 +58,7 @@ sudo -u epreport npm run migrate
 sudo -u epreport npm run build
 sudo systemctl restart epreport
 sudo systemctl status epreport --no-pager
+```
 
 ### Making the app reachable on the network, not just localhost
 
