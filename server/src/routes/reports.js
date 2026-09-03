@@ -3,7 +3,7 @@ const pool = require('../db/pool');
 const { requireAuth, requireRole, requireMinRole } = require('../middleware/auth');
 const { recordAudit } = require('../utils/audit');
 const { recordHistory } = require('../utils/history');
-const { sendReportSubmittedEmail } = require('../utils/email');
+const { sendReportSubmittedEmail, sendManagerCommentEmail } = require('../utils/email');
 const { renderTablePdf } = require('../utils/pdfTable');
 
 const router = express.Router();
@@ -185,6 +185,25 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
     entityId: reportId,
     details: { recipients: recipientEmails },
     ipAddress: ip,
+  });
+}
+
+/**
+ * Emails the submitting supervisor whenever a Manager (not Administrator)
+ * leaves a comment on their report, so they're prompted to review it
+ * without needing to notice it in the app first. Never throws -
+ * sendManagerCommentEmail logs failures instead of blocking the response.
+ */
+async function notifyManagerComment(reportId, commenter, comment) {
+  const report = await loadReportFull(reportId);
+  if (!report || !report.supervisor_email) return;
+  if (report.supervisor_email.toLowerCase() === (commenter.email || '').toLowerCase()) return;
+
+  await sendManagerCommentEmail({
+    toEmail: report.supervisor_email,
+    report,
+    comment,
+    commenterName: commenter.name,
   });
 }
 
@@ -478,6 +497,10 @@ router.post('/:id/comments', requireAuth, requireMinRole('manager'), async (req,
   );
   await recordHistory({ reportId: req.params.id, userId: req.user.id, action: 'Comment added' });
   await recordAudit({ userId: req.user.id, action: 'manager_comment', entity: 'daily_report', entityId: req.params.id, ipAddress: req.ip });
+
+  if (req.user.role === 'manager') {
+    await notifyManagerComment(req.params.id, req.user, comment.trim());
+  }
 
   res.status(201).json({ id: result.insertId });
 });

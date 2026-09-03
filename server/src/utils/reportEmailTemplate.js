@@ -8,6 +8,9 @@ const BRAND_BLUE = '#0f4d99';
 const BORDER = '#d7dde3';
 const HEAD_BG = '#eef2f6';
 const MUTED = '#6b7684';
+const AMBER = '#b45309';
+const AMBER_BG = '#fef6e7';
+const AMBER_BORDER = '#f0d59a';
 
 function esc(value) {
   return String(value ?? '')
@@ -35,15 +38,33 @@ function dataTable(headers, rows) {
   return `<tr><td style="padding:8px 0 4px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></td></tr>`;
 }
 
-/**
- * Renders a full Daily Report as a self-contained, email-client-safe HTML
- * document (table-based layout, inline styles, no external assets).
- */
-function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
+/** The "Report Date / Shift / Supervisor / ..." info table shared by every report email. */
+function reportInfoTable(report) {
   const incoming = report.incomingSupervisors?.length
     ? report.incomingSupervisors.map((s) => esc(s.user_name)).join(', ')
     : 'Not specified';
 
+  const rows = [
+    ['Report Date', esc(report.report_date)],
+    ['Shift', esc(report.shift_name)],
+    ['Submitting Supervisor', esc(report.supervisor_name)],
+    ['Incoming Supervisor(s)', incoming],
+    ['Status', esc(report.status), 'text-transform:capitalize;'],
+  ];
+  if (report.submitted_at) rows.push(['Submitted', esc(new Date(report.submitted_at).toLocaleString())]);
+  if (report.updated_at) rows.push(['Last Edited', esc(new Date(report.updated_at).toLocaleString())]);
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    ${rows.map(([label, value, extraStyle = '']) => `
+      <tr>
+        <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">${esc(label)}</td>
+        <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;${extraStyle}">${value}</td>
+      </tr>`).join('')}
+  </table>`;
+}
+
+/** The Driver Call-Outs / Shift Coverage / Work Order / Shift Notes sections shared by every report email. */
+function reportSectionsHtml(report) {
   const calloutRows = (report.callouts || []).map((c) => [
     esc(c.shuttle_number || '—'),
     esc(c.driver_name || '—'),
@@ -71,6 +92,38 @@ function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
     ['Additional Notes', report.notes],
   ].filter(([, v]) => v && String(v).trim());
 
+  const sections = `
+    <tr><td style="padding:0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${sectionTitle('Driver Call-Outs')}
+        ${dataTable(['Shuttle/Bus #', 'Driver', 'Comments'], calloutRows)}
+        ${sectionTitle('Shift Coverage')}
+        ${dataTable(['Driver', 'Moved From / OT', 'Moved From Shuttle #', 'To Cover Shuttle/Bus #', 'Comments'], coverageRows)}
+        ${sectionTitle('Work Order Placed')}
+        ${dataTable(['Location', 'Comments', 'Entered By', 'Date/Time'], workOrderRows)}
+        ${notesRows.length ? sectionTitle('Shift Notes') : ''}
+      </table>
+    </td></tr>`;
+
+  const notes = notesRows.length ? `
+    <tr><td style="padding:4px 28px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${notesRows.map(([label, value]) => `
+          <tr>
+            <td style="padding:8px 0 2px;font:600 12px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(label)}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 6px;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${nl2br(value)}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </td></tr>` : '';
+
+  return sections + notes;
+}
+
+/** Shared outer envelope (fluid-width card, header band, footer, CTA button) every report email uses. */
+function renderEmailShell({ headerTitle, headerSubtitle, bodyHtml, viewUrl, viewLabel, logoCid }) {
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;">
   <tr>
@@ -79,76 +132,14 @@ function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
         <tr>
           <td style="background:${BRAND_BLUE};padding:20px 28px;">
             ${logoCid ? `<img src="cid:${esc(logoCid)}" alt="Port of Seattle" height="28" style="display:block;margin-bottom:10px;">` : ''}
-            <div style="font:700 18px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#ffffff;">Employee Parking Daily Report</div>
-            <div style="font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#cfe0f5;margin-top:2px;">Report Submitted</div>
+            <div style="font:700 18px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#ffffff;">${esc(headerTitle)}</div>
+            <div style="font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#cfe0f5;margin-top:2px;">${esc(headerSubtitle)}</div>
           </td>
         </tr>
-        <tr>
-          <td style="padding:24px 28px 8px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">Report Date</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(report.report_date)}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Shift</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(report.shift_name)}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Submitting Supervisor</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(report.supervisor_name)}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Incoming Supervisor(s)</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${incoming}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Status</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;text-transform:capitalize;">${esc(report.status)}</td>
-              </tr>
-              ${report.submitted_at ? `
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Submitted</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(new Date(report.submitted_at).toLocaleString())}</td>
-              </tr>` : ''}
-              ${report.updated_at ? `
-              <tr>
-                <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};">Last Edited</td>
-                <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(new Date(report.updated_at).toLocaleString())}</td>
-              </tr>` : ''}
-            </table>
-          </td>
-        </tr>
-
-        <tr><td style="padding:0 28px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            ${sectionTitle('Driver Call-Outs')}
-            ${dataTable(['Shuttle/Bus #', 'Driver', 'Comments'], calloutRows)}
-            ${sectionTitle('Shift Coverage')}
-            ${dataTable(['Driver', 'Moved From / OT', 'Moved From Shuttle #', 'To Cover Shuttle/Bus #', 'Comments'], coverageRows)}
-            ${sectionTitle('Work Order Placed')}
-            ${dataTable(['Location', 'Comments', 'Entered By', 'Date/Time'], workOrderRows)}
-            ${notesRows.length ? sectionTitle('Shift Notes') : ''}
-          </table>
-        </td></tr>
-
-        ${notesRows.length ? `
-        <tr><td style="padding:4px 28px 8px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            ${notesRows.map(([label, value]) => `
-              <tr>
-                <td style="padding:8px 0 2px;font:600 12px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(label)}</td>
-              </tr>
-              <tr>
-                <td style="padding:0 0 6px;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${nl2br(value)}</td>
-              </tr>
-            `).join('')}
-          </table>
-        </td></tr>` : ''}
-
+        ${bodyHtml}
         <tr>
           <td style="padding:20px 28px 28px;">
-            <a href="${esc(viewUrl)}" style="display:inline-block;background:${BRAND_BLUE};color:#ffffff;text-decoration:none;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:10px 18px;border-radius:5px;">View Report in Employee Parking Reporting</a>
+            <a href="${esc(viewUrl)}" style="display:inline-block;background:${BRAND_BLUE};color:#ffffff;text-decoration:none;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:10px 18px;border-radius:5px;">${esc(viewLabel)}</a>
           </td>
         </tr>
         <tr>
@@ -163,15 +154,71 @@ function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
 }
 
 /**
- * Plain-text fallback for mail clients that don't render HTML, or the
- * account-setup/report-detail preview shown in the [email disabled] log
- * line when SEND_EMAILS=false.
+ * Renders a full Daily Report as a self-contained, email-client-safe HTML
+ * document (table-based layout, inline styles, no external assets).
  */
-function renderReportEmailText(report, { viewUrl } = {}) {
+function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
+  const bodyHtml = `
+    <tr>
+      <td style="padding:24px 28px 8px;">
+        ${reportInfoTable(report)}
+      </td>
+    </tr>
+    ${reportSectionsHtml(report)}`;
+
+  return renderEmailShell({
+    headerTitle: 'Employee Parking Daily Report',
+    headerSubtitle: 'Report Submitted',
+    bodyHtml,
+    viewUrl,
+    viewLabel: 'View Report in Employee Parking Reporting',
+    logoCid,
+  });
+}
+
+/**
+ * Renders a "Please Review Manager's Note" email: the manager's comment
+ * highlighted up top, followed by the full report it was left on, so the
+ * recipient has full context without needing to click through first.
+ */
+function renderManagerCommentEmailHtml(report, { comment, commenterName, viewUrl, logoCid } = {}) {
+  const noteBox = `
+    <tr>
+      <td style="padding:20px 28px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${AMBER_BG};border:1px solid ${AMBER_BORDER};border-radius:6px;">
+          <tr>
+            <td style="padding:14px 18px;">
+              <div style="font:600 12px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${AMBER};text-transform:uppercase;letter-spacing:0.03em;">Manager's Note — ${esc(commenterName)}</div>
+              <div style="font:14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;margin-top:6px;">${nl2br(comment)}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+
+  const bodyHtml = `
+    ${noteBox}
+    <tr>
+      <td style="padding:20px 28px 8px;">
+        ${reportInfoTable(report)}
+      </td>
+    </tr>
+    ${reportSectionsHtml(report)}`;
+
+  return renderEmailShell({
+    headerTitle: 'Employee Parking Daily Report',
+    headerSubtitle: "Please Review Manager's Note",
+    bodyHtml,
+    viewUrl,
+    viewLabel: 'Review Report & Note',
+    logoCid,
+  });
+}
+
+/** The report detail lines shared by both plain-text email variants (no title, no closing "view" line - callers add their own framing around this). */
+function reportTextBody(report) {
   const incoming = report.incomingSupervisors?.length ? report.incomingSupervisors.map((s) => s.user_name).join(', ') : 'Not specified';
   const lines = [
-    'Employee Parking Daily Report - Report Submitted',
-    '',
     `Report Date: ${report.report_date}`,
     `Shift: ${report.shift_name}`,
     `Submitting Supervisor: ${report.supervisor_name}`,
@@ -201,8 +248,37 @@ function renderReportEmailText(report, { viewUrl } = {}) {
   if (report.significant_activity) lines.push('Significant Activity:', report.significant_activity, '');
   if (report.notes) lines.push('Additional Notes:', report.notes, '');
 
-  lines.push(`View the report: ${viewUrl}`);
-  return lines.join('\n');
+  return lines;
 }
 
-module.exports = { renderReportEmailHtml, renderReportEmailText };
+/**
+ * Plain-text fallback for mail clients that don't render HTML, or the
+ * account-setup/report-detail preview shown in the [email disabled] log
+ * line when SEND_EMAILS=false.
+ */
+function renderReportEmailText(report, { viewUrl } = {}) {
+  return [
+    'Employee Parking Daily Report - Report Submitted',
+    '',
+    ...reportTextBody(report),
+    `View the report: ${viewUrl}`,
+  ].join('\n');
+}
+
+/** Plain-text fallback for the "Please Review Manager's Note" email. */
+function renderManagerCommentEmailText(report, { comment, commenterName, viewUrl } = {}) {
+  return [
+    "Please Review Manager's Note",
+    '',
+    `${commenterName} left a note on this Daily Report:`,
+    '',
+    comment,
+    '',
+    '---',
+    '',
+    ...reportTextBody(report),
+    `Review the report: ${viewUrl}`,
+  ].join('\n');
+}
+
+module.exports = { renderReportEmailHtml, renderReportEmailText, renderManagerCommentEmailHtml, renderManagerCommentEmailText };

@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const { recordEmailLog } = require('./emailLog');
-const { renderReportEmailHtml, renderReportEmailText } = require('./reportEmailTemplate');
+const { renderReportEmailHtml, renderReportEmailText, renderManagerCommentEmailHtml, renderManagerCommentEmailText } = require('./reportEmailTemplate');
 const { LOGO_PATH, logoExists } = require('./logo');
 
 const LOGO_CID = 'port-of-seattle-logo';
@@ -139,4 +139,28 @@ async function sendReportSubmittedEmail({ toEmail, report }) {
   });
 }
 
-module.exports = { sendPasswordResetCode, sendAccountSetupEmail, sendReportSubmittedEmail, emailEnabled };
+/**
+ * Sent to the submitting supervisor whenever a Manager (not Administrator)
+ * leaves a comment on their report - includes the manager's note plus the
+ * full report, so the supervisor has everything they need to review it in
+ * one email without necessarily needing to click through first.
+ */
+async function sendManagerCommentEmail({ toEmail, report, comment, commenterName }) {
+  const viewUrl = `${appUrl()}/reports/${report.id}`;
+  const hasLogo = logoExists();
+  const html = renderManagerCommentEmailHtml(report, { comment, commenterName, viewUrl, logoCid: hasLogo ? LOGO_CID : null });
+  const text = renderManagerCommentEmailText(report, { comment, commenterName, viewUrl });
+
+  await sendMail({
+    to: toEmail,
+    subject: "Please Review Manager's Note",
+    text,
+    html,
+    attachments: hasLogo ? [{ filename: 'port-of-seattle-logo.png', path: LOGO_PATH, cid: LOGO_CID }] : undefined,
+    emailType: 'manager_comment',
+    relatedEntity: 'daily_report',
+    relatedId: report.id,
+  });
+}
+
+module.exports = { sendPasswordResetCode, sendAccountSetupEmail, sendReportSubmittedEmail, sendManagerCommentEmail, emailEnabled };
