@@ -283,4 +283,117 @@ function renderManagerCommentEmailText(report, { comment, commenterName, comment
   ].join('\n');
 }
 
-module.exports = { renderReportEmailHtml, renderReportEmailText, renderManagerCommentEmailHtml, renderManagerCommentEmailText };
+/**
+ * Renders the weekly digest sent to every Manager each Monday at 04:00,
+ * aggregating every supervisor's submitted Daily Reports from the prior
+ * Monday-Sunday week into one set of rollup tables (as opposed to the
+ * single-report layout the other templates use).
+ */
+function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCid } = {}) {
+  const calloutRows = (data.callouts || []).map((c) => [
+    esc(c.report_date),
+    esc(c.shift_name),
+    esc(c.supervisor_name),
+    esc(c.shuttle_number || '—'),
+    esc(c.driver_name || '—'),
+    nl2br(c.notes || '—'),
+  ]);
+
+  const coverageRows = (data.coverage || []).map((c) => [
+    esc(c.report_date),
+    esc(c.shift_name),
+    esc(c.supervisor_name),
+    esc(COVERAGE_LABELS[c.coverage_type] || c.coverage_type),
+    esc(c.original_shuttle_number || '—'),
+    esc(c.shuttle_number || '—'),
+    nl2br(c.notes || '—'),
+  ]);
+
+  const workOrderRows = (data.workOrders || []).map((w) => [
+    esc(w.report_date),
+    esc(w.shift_name),
+    esc(w.entered_by),
+    esc(w.location),
+    nl2br(w.comments || '—'),
+  ]);
+
+  const notesRows = (list) => (list || []).map((n) => [
+    esc(n.report_date),
+    esc(n.shift_name),
+    esc(n.supervisor_name),
+    nl2br(n.comments),
+  ]);
+
+  const bodyHtml = `
+    <tr>
+      <td style="padding:24px 28px 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">Week Covered</td>
+            <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(startDate)} to ${esc(endDate)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr><td style="padding:0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${sectionTitle('Driver Call-Out')}
+        ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Shuttle/Bus #', 'Driver', 'Comments'], calloutRows)}
+        ${sectionTitle('Shift Coverage')}
+        ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Moved From / OT', 'Moved From Shuttle #', 'To Cover Shuttle/Bus #', 'Comments'], coverageRows)}
+        ${sectionTitle('Work Order Placed')}
+        ${dataTable(['Report Date', 'Shift', 'Entered by', 'Location', 'Comments'], workOrderRows)}
+        ${sectionTitle('Shift Notes')}
+      </table>
+    </td></tr>
+    <tr><td style="padding:4px 28px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:10px 0 4px;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">Bus Issues</td></tr>
+        ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Comments'], notesRows(data.busIssues))}
+        <tr><td style="padding:14px 0 4px;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">Significant Activity</td></tr>
+        ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Comments'], notesRows(data.significantActivity))}
+        <tr><td style="padding:14px 0 4px;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">Additional Notes</td></tr>
+        ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Comments'], notesRows(data.additionalNotes))}
+      </table>
+    </td></tr>`;
+
+  return renderEmailShell({
+    headerTitle: 'Employee Parking Weekly Report',
+    headerSubtitle: `Week of ${startDate} to ${endDate}`,
+    bodyHtml,
+    viewUrl,
+    viewLabel: 'Open Employee Parking Reporting',
+    logoCid,
+  });
+}
+
+/** Plain-text fallback for the weekly digest email. */
+function renderWeeklyReportEmailText(data, { startDate, endDate, viewUrl } = {}) {
+  const line = (label, list, fields) => [
+    `--- ${label} ---`,
+    ...(list?.length ? list.map((r) => fields.map((f) => r[f]).filter(Boolean).join(' / ')) : ['None reported.']),
+    '',
+  ];
+
+  return [
+    'Employee Parking Weekly Report',
+    `Week Covered: ${startDate} to ${endDate}`,
+    '',
+    ...line('Driver Call-Out', data.callouts, ['report_date', 'shift_name', 'supervisor_name', 'shuttle_number', 'driver_name', 'notes']),
+    ...line('Shift Coverage', data.coverage, ['report_date', 'shift_name', 'supervisor_name', 'coverage_type', 'original_shuttle_number', 'shuttle_number', 'notes']),
+    ...line('Work Order Placed', data.workOrders, ['report_date', 'shift_name', 'entered_by', 'location', 'comments']),
+    ...line('Shift Notes - Bus Issues', data.busIssues, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    ...line('Shift Notes - Significant Activity', data.significantActivity, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    ...line('Shift Notes - Additional Notes', data.additionalNotes, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    `Open the application: ${viewUrl}`,
+  ].join('\n');
+}
+
+module.exports = {
+  renderReportEmailHtml,
+  renderReportEmailText,
+  renderManagerCommentEmailHtml,
+  renderManagerCommentEmailText,
+  renderWeeklyReportEmailHtml,
+  renderWeeklyReportEmailText,
+};

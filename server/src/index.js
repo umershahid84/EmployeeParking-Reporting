@@ -1,5 +1,6 @@
 require('./config/env');
 const app = require('./app');
+const { scheduleWeeklyReport } = require('./jobs/weeklyReport');
 
 // APP_URL is stamped into every link the app emails out (account setup,
 // password reset, "view this report"). If it's plain http:// against a
@@ -30,4 +31,5 @@ const port = process.env.PORT || 4000;
 const host = process.env.HOST || '0.0.0.0';
 app.listen(port, host, () => {
   console.log(`Employee Parking Reporting API listening on ${host}:${port}`);
+  scheduleWeeklyReport();
 });

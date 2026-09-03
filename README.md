@@ -346,7 +346,7 @@ and when.
 
 ## Email notifications
 
-The app sends four kinds of email, all through the SMTP relay configured
+The app sends five kinds of email, all through the SMTP relay configured
 in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
 `sent`/`failed`/`skipped`) as a permanent audit trail:
 
@@ -369,6 +369,15 @@ in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
    Portal → Email Notifications) get an email with subject "Please Review
    Manager's Note", containing the note itself plus the full report, so
    recipients have everything they need to act on it in one place.
+5. **Weekly report** — every Monday at 04:00 (server-local time), every
+   **active Manager** automatically receives a digest of the prior
+   Monday-Sunday week's submitted Daily Reports across **all** supervisors,
+   rolled up into: Driver Call-Out, Shift Coverage, Work Order Placed, and
+   Shift Notes (split into Bus Issues, Significant Activity, and Additional
+   Notes) — each as its own table with Report Date/Shift/Submitted-by
+   columns. This is a fixed schedule (`node-cron`, `0 4 * * 1`) set in
+   `server/src/jobs/weeklyReport.js`, not admin-configurable through the UI;
+   change the cron expression there and redeploy to adjust the day/time.
 
 Set `SEND_EMAILS=false` to disable outbound mail entirely — every email is
 logged instead of sent (still recorded in `email_log` with status

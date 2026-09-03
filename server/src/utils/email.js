@@ -1,6 +1,13 @@
 const nodemailer = require('nodemailer');
 const { recordEmailLog } = require('./emailLog');
-const { renderReportEmailHtml, renderReportEmailText, renderManagerCommentEmailHtml, renderManagerCommentEmailText } = require('./reportEmailTemplate');
+const {
+  renderReportEmailHtml,
+  renderReportEmailText,
+  renderManagerCommentEmailHtml,
+  renderManagerCommentEmailText,
+  renderWeeklyReportEmailHtml,
+  renderWeeklyReportEmailText,
+} = require('./reportEmailTemplate');
 const { LOGO_PATH, logoExists } = require('./logo');
 
 const LOGO_CID = 'port-of-seattle-logo';
@@ -163,4 +170,35 @@ async function sendManagerCommentEmail({ toEmail, report, comment, commenterName
   });
 }
 
-module.exports = { sendPasswordResetCode, sendAccountSetupEmail, sendReportSubmittedEmail, sendManagerCommentEmail, emailEnabled };
+/**
+ * Sent to every active Manager each Monday at 04:00, rolling up all
+ * supervisors' submitted Daily Reports from the prior Monday-Sunday week
+ * into one digest (Driver Call-Outs, Shift Coverage, Work Orders Placed,
+ * and the three Shift Notes categories).
+ */
+async function sendWeeklyReportEmail({ toEmail, startDate, endDate, data }) {
+  const viewUrl = `${appUrl()}/reports`;
+  const hasLogo = logoExists();
+  const html = renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCid: hasLogo ? LOGO_CID : null });
+  const text = renderWeeklyReportEmailText(data, { startDate, endDate, viewUrl });
+
+  await sendMail({
+    to: toEmail,
+    subject: `Weekly Report - ${startDate} to ${endDate}`,
+    text,
+    html,
+    attachments: hasLogo ? [{ filename: 'port-of-seattle-logo.png', path: LOGO_PATH, cid: LOGO_CID }] : undefined,
+    emailType: 'weekly_report',
+    relatedEntity: 'weekly_report',
+    relatedId: null,
+  });
+}
+
+module.exports = {
+  sendPasswordResetCode,
+  sendAccountSetupEmail,
+  sendReportSubmittedEmail,
+  sendManagerCommentEmail,
+  sendWeeklyReportEmail,
+  emailEnabled,
+};
