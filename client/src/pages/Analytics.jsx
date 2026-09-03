@@ -130,10 +130,6 @@ export default function Analytics() {
       .finally(() => setLoading(false));
   }, [from, to, shiftIds, supervisorIds, driverId, shuttleId, datePreset, customFrom, customTo]);
 
-  function toggleId(setter, id) {
-    setter((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
   function drillDown(extraParams) {
     const params = new URLSearchParams();
     if (from) params.set('dateFrom', from);
@@ -228,39 +224,6 @@ export default function Analytics() {
               ))}
             </select>
           </label>
-        </div>
-
-        <div className="analytics-filter-row">
-          <div>
-            <span className="filter-group-label">Shift</span>
-            <div className="checkbox-list">
-              <label className="checkbox-item">
-                <input type="checkbox" checked={shiftIds.length === 0} onChange={() => setShiftIds([])} /> All Shifts
-              </label>
-              {shifts.map((s) => (
-                <label key={s.id} className="checkbox-item">
-                  <input type="checkbox" checked={shiftIds.includes(s.id)} onChange={() => toggleId(setShiftIds, s.id)} /> {s.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="analytics-filter-row">
-          <div>
-            <span className="filter-group-label">Supervisor</span>
-            <div className="checkbox-list">
-              <label className="checkbox-item">
-                <input type="checkbox" checked={supervisorIds.length === 0} onChange={() => setSupervisorIds([])} /> All Supervisors
-              </label>
-              {supervisors.map((s) => (
-                <label key={s.id} className="checkbox-item">
-                  <input type="checkbox" checked={supervisorIds.includes(s.id)} onChange={() => toggleId(setSupervisorIds, s.id)} />
-                  {s.name}{!s.is_active ? ' (inactive)' : ''}
-                </label>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
