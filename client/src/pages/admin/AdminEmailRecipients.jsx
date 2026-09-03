@@ -1,16 +1,46 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/client';
 
+const WEEKDAYS = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
+
 export default function AdminEmailRecipients() {
   const [recipients, setRecipients] = useState([]);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
 
+  const [schedule, setSchedule] = useState(null);
+  const [scheduleMessage, setScheduleMessage] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+
   async function load() {
     const { data } = await api.get('/email-recipients');
     setRecipients(data.recipients);
   }
-  useEffect(() => { load(); }, []);
+  async function loadSchedule() {
+    const { data } = await api.get('/settings/weekly-report');
+    setSchedule(data);
+  }
+  useEffect(() => { load(); loadSchedule(); }, []);
+
+  async function saveSchedule(e) {
+    e.preventDefault();
+    setScheduleError(''); setScheduleMessage('');
+    try {
+      const { data } = await api.put('/settings/weekly-report', schedule);
+      setSchedule(data);
+      setScheduleMessage('Weekly report schedule saved.');
+    } catch (err) {
+      setScheduleError(err.response?.data?.error || 'Unable to save schedule.');
+    }
+  }
 
   async function addRecipient(e) {
     e.preventDefault();
@@ -48,6 +78,50 @@ export default function AdminEmailRecipients() {
 
   return (
     <div>
+      <form className="card" onSubmit={saveSchedule}>
+        <h3>Weekly Report Schedule</h3>
+        <p className="muted">
+          Every active Manager automatically receives a weekly digest (Driver Call-Out, Shift Coverage,
+          Work Order Placed, and Shift Notes) rolling up the prior week's submitted Daily Reports. Choose
+          when it goes out below.
+        </p>
+        {schedule && (
+          <>
+            <div className="form-row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={schedule.enabled}
+                  onChange={(e) => setSchedule({ ...schedule, enabled: e.target.checked })}
+                />{' '}
+                Send weekly report
+              </label>
+              <label>Day
+                <select
+                  value={schedule.dayOfWeek}
+                  onChange={(e) => setSchedule({ ...schedule, dayOfWeek: Number(e.target.value) })}
+                  disabled={!schedule.enabled}
+                >
+                  {WEEKDAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </label>
+              <label>Time
+                <input
+                  type="time"
+                  value={schedule.time}
+                  onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
+                  disabled={!schedule.enabled}
+                  required
+                />
+              </label>
+            </div>
+            {scheduleError && <div className="error-text">{scheduleError}</div>}
+            {scheduleMessage && <div className="info-text">{scheduleMessage}</div>}
+            <button type="submit">Save Schedule</button>
+          </>
+        )}
+      </form>
+
       <p className="muted">
         Everyone active on this list receives an email whenever a Supervisor submits a Daily Report.
       </p>

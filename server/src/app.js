@@ -17,6 +17,7 @@ const supervisorRoutes = require('./routes/supervisors');
 const emailRecipientRoutes = require('./routes/emailRecipients');
 const analyticsRoutes = require('./routes/analytics');
 const auditRoutes = require('./routes/audit');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 
@@ -64,6 +65,7 @@ router.use('/api/supervisors', supervisorRoutes);
 router.use('/api/email-recipients', emailRecipientRoutes);
 router.use('/api/analytics', analyticsRoutes);
 router.use('/api/audit', auditRoutes);
+router.use('/api/settings', settingsRoutes);
 
 // Any /api/* request that didn't match a route above is a genuine 404,
 // not a client-side route to hand off to the SPA.

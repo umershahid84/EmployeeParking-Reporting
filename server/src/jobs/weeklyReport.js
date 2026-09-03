@@ -1,6 +1,7 @@
 const pool = require('../db/pool');
 const { sendWeeklyReportEmail } = require('../utils/email');
 const { recordAudit } = require('../utils/audit');
+const { getWeeklyReportSchedule } = require('../utils/settings');
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -136,12 +137,35 @@ async function sendWeeklyReportEmails(reference = new Date()) {
   return { startDate, endDate, sent: recipientEmails.length };
 }
 
-/** Schedules the weekly digest for every Monday at 04:00 server-local time. */
-function scheduleWeeklyReport() {
+let currentTask = null;
+
+/**
+ * (Re)applies the weekly digest schedule from app_settings (managed via the
+ * Admin Portal's Email Notifications page). Stops any previously scheduled
+ * cron task before starting a new one, so this is safe to call again
+ * whenever an administrator changes the day/time/enabled setting - no
+ * restart required for a schedule change to take effect.
+ */
+async function applyWeeklyReportSchedule() {
   const cron = require('node-cron');
-  cron.schedule('0 4 * * 1', () => {
+  if (currentTask) {
+    currentTask.stop();
+    currentTask = null;
+  }
+
+  const { dayOfWeek, time, enabled } = await getWeeklyReportSchedule();
+  if (!enabled) return;
+
+  const [hour, minute] = (time || '04:00').split(':').map(Number);
+  const cronExpression = `${minute} ${hour} * * ${dayOfWeek}`;
+  currentTask = cron.schedule(cronExpression, () => {
     sendWeeklyReportEmails().catch((err) => console.error('Weekly report job failed:', err));
   });
 }
 
-module.exports = { previousWeekRange, buildWeeklyReportData, sendWeeklyReportEmails, scheduleWeeklyReport };
+module.exports = {
+  previousWeekRange,
+  buildWeeklyReportData,
+  sendWeeklyReportEmails,
+  applyWeeklyReportSchedule,
+};

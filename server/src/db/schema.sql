@@ -243,6 +243,16 @@ CREATE TABLE IF NOT EXISTS email_recipients (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
+-- Application Settings (generic key/value store, managed via the Admin
+-- Portal - e.g. the weekly report schedule)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_settings (
+  setting_key VARCHAR(100) PRIMARY KEY,
+  setting_value TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
 -- Email Delivery Log (audit trail of every email the app sends/attempts)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS email_log (

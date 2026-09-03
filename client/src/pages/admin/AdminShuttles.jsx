@@ -29,6 +29,17 @@ export default function AdminShuttles() {
     load();
   }
 
+  async function editShuttle(s) {
+    const newNumber = window.prompt('Shuttle/Bus number:', s.shuttle_number);
+    if (newNumber === null || newNumber === s.shuttle_number) return;
+    try {
+      await api.put(`/shuttles/${s.id}`, { shuttleNumber: newNumber });
+      load();
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Unable to update shuttle.');
+    }
+  }
+
   return (
     <div>
       <form className="card" onSubmit={createShuttle}>
@@ -45,7 +56,10 @@ export default function AdminShuttles() {
             <tr key={s.id}>
               <td>{s.shuttle_number}</td>
               <td>{s.is_active ? 'Active' : 'Inactive'}</td>
-              <td><button onClick={() => toggleActive(s)}>{s.is_active ? 'Deactivate' : 'Reactivate'}</button></td>
+              <td className="row-actions">
+                <button onClick={() => editShuttle(s)}>Edit</button>
+                <button onClick={() => toggleActive(s)}>{s.is_active ? 'Deactivate' : 'Reactivate'}</button>
+              </td>
             </tr>
           ))}
         </tbody>

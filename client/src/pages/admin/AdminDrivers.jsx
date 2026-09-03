@@ -30,6 +30,20 @@ export default function AdminDrivers() {
     load();
   }
 
+  async function editDriver(d) {
+    const newName = window.prompt('Driver name:', d.driver_name);
+    if (newName === null) return;
+    const newEmployeeId = window.prompt('Employee ID:', d.employee_id || '');
+    if (newEmployeeId === null) return;
+    if (newName === d.driver_name && newEmployeeId === (d.employee_id || '')) return;
+    try {
+      await api.put(`/drivers/${d.id}`, { driverName: newName, employeeId: newEmployeeId });
+      load();
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Unable to update driver.');
+    }
+  }
+
   return (
     <div>
       <form className="card" onSubmit={createDriver}>
@@ -50,7 +64,10 @@ export default function AdminDrivers() {
               <td>{d.driver_name}</td>
               <td>{d.employee_id || '—'}</td>
               <td>{d.is_active ? 'Active' : 'Inactive'}</td>
-              <td><button onClick={() => toggleActive(d)}>{d.is_active ? 'Deactivate' : 'Reactivate'}</button></td>
+              <td className="row-actions">
+                <button onClick={() => editDriver(d)}>Edit</button>
+                <button onClick={() => toggleActive(d)}>{d.is_active ? 'Deactivate' : 'Reactivate'}</button>
+              </td>
             </tr>
           ))}
         </tbody>

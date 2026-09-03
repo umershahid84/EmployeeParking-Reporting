@@ -71,10 +71,15 @@ router.put('/:id', async (req, res) => {
     roleId = roleRows[0].id;
   }
 
-  await pool.query(
-    `UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), role_id = ?, is_active = COALESCE(?, is_active) WHERE id = ?`,
-    [name ?? null, email ? email.toLowerCase().trim() : null, roleId, typeof isActive === 'boolean' ? isActive : null, req.params.id]
-  );
+  try {
+    await pool.query(
+      `UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), role_id = ?, is_active = COALESCE(?, is_active) WHERE id = ?`,
+      [name ?? null, email ? email.toLowerCase().trim() : null, roleId, typeof isActive === 'boolean' ? isActive : null, req.params.id]
+    );
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'A user with that email already exists.' });
+    throw err;
+  }
   await recordAudit({ userId: req.user.id, action: 'user_updated', entity: 'user', entityId: req.params.id, details: req.body, ipAddress: req.ip });
   res.json({ ok: true });
 });

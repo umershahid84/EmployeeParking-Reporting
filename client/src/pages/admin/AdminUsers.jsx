@@ -43,6 +43,21 @@ export default function AdminUsers() {
     setMessage(`Account access reset. A secure setup link was emailed to ${u.email}.`);
   }
 
+  async function editUser(u) {
+    const newName = window.prompt('Name:', u.name);
+    if (newName === null) return;
+    const newEmail = window.prompt('Email address:', u.email);
+    if (newEmail === null) return;
+    if (newName === u.name && newEmail === u.email) return;
+    setError('');
+    try {
+      await api.put(`/users/${u.id}`, { name: newName, email: newEmail });
+      load();
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Unable to update user.');
+    }
+  }
+
   return (
     <div>
       <form className="card" onSubmit={createUser}>
@@ -79,6 +94,7 @@ export default function AdminUsers() {
               </td>
               <td>{u.is_active ? 'Active' : 'Inactive'}</td>
               <td className="row-actions">
+                <button onClick={() => editUser(u)}>Edit</button>
                 <button onClick={() => toggleActive(u)}>{u.is_active ? 'Deactivate' : 'Activate'}</button>
                 <button onClick={() => resetAccount(u)}>Reset Account</button>
               </td>
