@@ -140,16 +140,16 @@ async function sendReportSubmittedEmail({ toEmail, report }) {
 }
 
 /**
- * Sent to the submitting supervisor whenever a Manager (not Administrator)
- * leaves a comment on their report - includes the manager's note plus the
- * full report, so the supervisor has everything they need to review it in
- * one email without necessarily needing to click through first.
+ * Sent to the submitting supervisor and the daily-report distribution list
+ * as soon as a Manager or Administrator saves a comment on a report -
+ * includes the note plus the full report, so recipients have everything
+ * they need to review it in one email without necessarily clicking through.
  */
-async function sendManagerCommentEmail({ toEmail, report, comment, commenterName }) {
+async function sendManagerCommentEmail({ toEmail, report, comment, commenterName, commenterRole }) {
   const viewUrl = `${appUrl()}/reports/${report.id}`;
   const hasLogo = logoExists();
-  const html = renderManagerCommentEmailHtml(report, { comment, commenterName, viewUrl, logoCid: hasLogo ? LOGO_CID : null });
-  const text = renderManagerCommentEmailText(report, { comment, commenterName, viewUrl });
+  const html = renderManagerCommentEmailHtml(report, { comment, commenterName, commenterRole, viewUrl, logoCid: hasLogo ? LOGO_CID : null });
+  const text = renderManagerCommentEmailText(report, { comment, commenterName, commenterRole, viewUrl });
 
   await sendMail({
     to: toEmail,

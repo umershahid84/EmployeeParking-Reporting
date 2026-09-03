@@ -189,22 +189,35 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
 }
 
 /**
- * Emails the submitting supervisor whenever a Manager (not Administrator)
- * leaves a comment on their report, so they're prompted to review it
- * without needing to notice it in the app first. Never throws -
- * sendManagerCommentEmail logs failures instead of blocking the response.
+ * Emails the submitting supervisor and every active daily-report recipient
+ * (the same distribution list used for the "report submitted" email,
+ * managed in the Admin Portal) as soon as a Manager or Administrator saves
+ * a comment on a report. Never throws - sendManagerCommentEmail logs
+ * failures per-recipient instead of blocking the response.
  */
 async function notifyManagerComment(reportId, commenter, comment) {
   const report = await loadReportFull(reportId);
-  if (!report || !report.supervisor_email) return;
-  if (report.supervisor_email.toLowerCase() === (commenter.email || '').toLowerCase()) return;
+  if (!report) return;
 
-  await sendManagerCommentEmail({
-    toEmail: report.supervisor_email,
-    report,
-    comment,
-    commenterName: commenter.name,
-  });
+  const [recipientRows] = await pool.query(
+    `SELECT email FROM email_recipients WHERE notification_type = 'daily_report' AND is_active = 1`
+  );
+
+  const commenterEmail = (commenter.email || '').toLowerCase();
+  const recipientEmails = [...new Set([
+    report.supervisor_email,
+    ...recipientRows.map((r) => r.email),
+  ].filter(Boolean).map((e) => e.toLowerCase()))].filter((e) => e !== commenterEmail);
+
+  for (const email of recipientEmails) {
+    await sendManagerCommentEmail({
+      toEmail: email,
+      report,
+      comment,
+      commenterName: commenter.name,
+      commenterRole: commenter.role,
+    });
+  }
 }
 
 function describeReportFilters(query) {
@@ -498,9 +511,7 @@ router.post('/:id/comments', requireAuth, requireMinRole('manager'), async (req,
   await recordHistory({ reportId: req.params.id, userId: req.user.id, action: 'Comment added' });
   await recordAudit({ userId: req.user.id, action: 'manager_comment', entity: 'daily_report', entityId: req.params.id, ipAddress: req.ip });
 
-  if (req.user.role === 'manager') {
-    await notifyManagerComment(req.params.id, req.user, comment.trim());
-  }
+  await notifyManagerComment(req.params.id, req.user, comment.trim());
 
   res.status(201).json({ id: result.insertId });
 });

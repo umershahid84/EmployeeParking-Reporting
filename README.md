@@ -363,12 +363,12 @@ in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
    link to the report. Administrators manage that list — add, edit, remove,
    enable/disable — entirely through the UI; nothing is hard-coded, so no
    code change or redeploy is needed to change who gets notified.
-4. **Manager's note added** — when a **Manager** (not Administrator) leaves
-   a comment on a report, the report's submitting supervisor gets an email
-   with subject "Please Review Manager's Note", containing the note itself
-   plus the full report, so they have everything they need to act on it in
-   one place. Comments from Administrators don't trigger this — it's
-   specifically the Manager review workflow.
+4. **Report comment added** — as soon as a Manager or Administrator saves a
+   comment on a report, the report's submitting supervisor and every
+   **active** address in the same daily-report distribution list (Admin
+   Portal → Email Notifications) get an email with subject "Please Review
+   Manager's Note", containing the note itself plus the full report, so
+   recipients have everything they need to act on it in one place.
 
 Set `SEND_EMAILS=false` to disable outbound mail entirely — every email is
 logged instead of sent (still recorded in `email_log` with status

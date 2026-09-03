@@ -177,18 +177,19 @@ function renderReportEmailHtml(report, { viewUrl, logoCid } = {}) {
 }
 
 /**
- * Renders a "Please Review Manager's Note" email: the manager's comment
- * highlighted up top, followed by the full report it was left on, so the
- * recipient has full context without needing to click through first.
+ * Renders a "Please Review Manager's Note" email: the comment highlighted
+ * up top, followed by the full report it was left on, so the recipient has
+ * full context without needing to click through first.
  */
-function renderManagerCommentEmailHtml(report, { comment, commenterName, viewUrl, logoCid } = {}) {
+function renderManagerCommentEmailHtml(report, { comment, commenterName, commenterRole, viewUrl, logoCid } = {}) {
+  const roleLabel = commenterRole ? ` (${commenterRole[0].toUpperCase()}${commenterRole.slice(1)})` : '';
   const noteBox = `
     <tr>
       <td style="padding:20px 28px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${AMBER_BG};border:1px solid ${AMBER_BORDER};border-radius:6px;">
           <tr>
             <td style="padding:14px 18px;">
-              <div style="font:600 12px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${AMBER};text-transform:uppercase;letter-spacing:0.03em;">Manager's Note — ${esc(commenterName)}</div>
+              <div style="font:600 12px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${AMBER};text-transform:uppercase;letter-spacing:0.03em;">Note from ${esc(commenterName)}${esc(roleLabel)}</div>
               <div style="font:14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;margin-top:6px;">${nl2br(comment)}</div>
             </td>
           </tr>
@@ -266,11 +267,12 @@ function renderReportEmailText(report, { viewUrl } = {}) {
 }
 
 /** Plain-text fallback for the "Please Review Manager's Note" email. */
-function renderManagerCommentEmailText(report, { comment, commenterName, viewUrl } = {}) {
+function renderManagerCommentEmailText(report, { comment, commenterName, commenterRole, viewUrl } = {}) {
+  const roleLabel = commenterRole ? ` (${commenterRole[0].toUpperCase()}${commenterRole.slice(1)})` : '';
   return [
     "Please Review Manager's Note",
     '',
-    `${commenterName} left a note on this Daily Report:`,
+    `${commenterName}${roleLabel} left a note on this Daily Report:`,
     '',
     comment,
     '',
