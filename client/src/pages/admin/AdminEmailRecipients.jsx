@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/client';
+import Toggle from '../../components/Toggle';
+
+function formatTime(time) {
+  const [h, m] = (time || '').split(':').map(Number);
+  if (Number.isNaN(h)) return time;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = ((h + 11) % 12) + 1;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
 
 const WEEKDAYS = [
   { value: 0, label: 'Sunday' },
@@ -78,25 +87,33 @@ export default function AdminEmailRecipients() {
 
   return (
     <div>
-      <form className="card" onSubmit={saveSchedule}>
-        <h3>Weekly Report Schedule</h3>
-        <p className="muted">
-          Every active Manager automatically receives a weekly digest (Driver Call-Out, Shift Coverage,
-          Work Order Placed, and Shift Notes) rolling up the prior week's submitted Daily Reports. Choose
-          when it goes out below.
-        </p>
+      <form className="card schedule-card" onSubmit={saveSchedule}>
+        <div className="schedule-card-header">
+          <div>
+            <h3>Weekly Report Schedule</h3>
+            <p className="muted">
+              Every active Manager automatically receives a weekly digest (Driver Call-Out, Shift Coverage,
+              Work Order Placed, and Shift Notes) rolling up the prior week's submitted Daily Reports.
+            </p>
+          </div>
+          {schedule && (
+            <span className={`schedule-badge ${schedule.enabled ? 'on' : ''}`}>
+              {schedule.enabled
+                ? `Active — ${WEEKDAYS.find((d) => d.value === schedule.dayOfWeek)?.label} ${formatTime(schedule.time)}`
+                : 'Disabled'}
+            </span>
+          )}
+        </div>
+
         {schedule && (
           <>
-            <div className="form-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={schedule.enabled}
-                  onChange={(e) => setSchedule({ ...schedule, enabled: e.target.checked })}
-                />{' '}
-                Send weekly report
-              </label>
-              <label>Day
+            <div className="schedule-fields">
+              <Toggle
+                checked={schedule.enabled}
+                onChange={(checked) => setSchedule({ ...schedule, enabled: checked })}
+                label="Send weekly report"
+              />
+              <label>Day of Week
                 <select
                   value={schedule.dayOfWeek}
                   onChange={(e) => setSchedule({ ...schedule, dayOfWeek: Number(e.target.value) })}
@@ -115,9 +132,12 @@ export default function AdminEmailRecipients() {
                 />
               </label>
             </div>
-            {scheduleError && <div className="error-text">{scheduleError}</div>}
-            {scheduleMessage && <div className="info-text">{scheduleMessage}</div>}
-            <button type="submit">Save Schedule</button>
+
+            <div className="schedule-form-footer">
+              {scheduleError && <div className="error-text">{scheduleError}</div>}
+              {scheduleMessage && <div className="info-text">{scheduleMessage}</div>}
+              <button type="submit">Save Schedule</button>
+            </div>
           </>
         )}
       </form>

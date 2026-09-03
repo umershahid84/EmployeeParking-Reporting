@@ -29,21 +29,24 @@ export default function ChangePassword() {
 
   return (
     <div className="page">
-      <h2>Change Password</h2>
-      <form className="card" style={{ maxWidth: 420 }} onSubmit={handleSubmit}>
-        <label>Current Password
-          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-        </label>
-        <label>New Password
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
-        </label>
-        <label>Confirm New Password
-          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
-        </label>
-        {error && <div className="error-text">{error}</div>}
-        {message && <div className="info-text">{message}</div>}
-        <button type="submit">Update Password</button>
-      </form>
+      <div className="centered-form">
+        <form className="card password-card" onSubmit={handleSubmit}>
+          <h2>Change Password</h2>
+          <p className="muted">Choose a strong new password to protect your account.</p>
+          <label>Current Password
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+          </label>
+          <label>New Password
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+          </label>
+          <label>Confirm New Password
+            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
+          </label>
+          {error && <div className="error-text">{error}</div>}
+          {message && <div className="info-text">{message}</div>}
+          <button type="submit">Update Password</button>
+        </form>
+      </div>
     </div>
   );
 }

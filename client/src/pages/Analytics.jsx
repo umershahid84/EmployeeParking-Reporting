@@ -208,6 +208,26 @@ export default function Analytics() {
               {shuttles.map((s) => <option key={s.id} value={s.id}>{s.shuttle_number}</option>)}
             </select>
           </label>
+          <label>Shift
+            <select
+              value={shiftIds.length === 1 ? shiftIds[0] : ''}
+              onChange={(e) => setShiftIds(e.target.value ? [Number(e.target.value)] : [])}
+            >
+              <option value="">All Shifts</option>
+              {shifts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label>Supervisor
+            <select
+              value={supervisorIds.length === 1 ? supervisorIds[0] : ''}
+              onChange={(e) => setSupervisorIds(e.target.value ? [Number(e.target.value)] : [])}
+            >
+              <option value="">All Supervisors</option>
+              {supervisors.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}{!s.is_active ? ' (inactive)' : ''}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="analytics-filter-row">
