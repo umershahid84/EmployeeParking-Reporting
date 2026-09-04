@@ -198,9 +198,10 @@ async function sendWeeklyReportEmail({ toEmail, startDate, endDate, data }) {
 
 /**
  * Sent to every active Manager as soon as a Supervisor submits a Daily
- * Report, rolling up the most recently submitted reports system-wide
- * (across all supervisors) into the same digest layout as the weekly
- * report, just scoped to a report count instead of a date range.
+ * Report, rolling up every report submitted system-wide (across all
+ * supervisors) in the trailing 24 hours into the same digest layout as
+ * the weekly report, just scoped to a rolling time window instead of a
+ * fixed date range.
  */
 async function sendRecentReportsDigestEmail({ toEmail, reportCount, data }) {
   const viewUrl = `${appUrl()}/reports`;
@@ -210,7 +211,7 @@ async function sendRecentReportsDigestEmail({ toEmail, reportCount, data }) {
 
   await sendMail({
     to: toEmail,
-    subject: `Daily Report Digest - Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    subject: `Daily Report Digest - Last 24 Hours (${reportCount} Report${reportCount === 1 ? '' : 's'})`,
     text,
     html,
     attachments: hasLogo ? [{ filename: 'port-of-seattle-logo.png', path: LOGO_PATH, cid: LOGO_CID }] : undefined,

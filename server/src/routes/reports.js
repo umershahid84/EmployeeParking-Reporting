@@ -7,8 +7,6 @@ const { sendReportSubmittedEmail, sendManagerCommentEmail, sendRecentReportsDige
 const { renderTablePdf } = require('../utils/pdfTable');
 const { buildRecentReportsDigestData } = require('../jobs/weeklyReport');
 
-const RECENT_REPORTS_DIGEST_COUNT = 3;
-
 const router = express.Router();
 
 const COVERAGE_TYPES = ['ot', 'moved', 'not_covered'];
@@ -201,16 +199,18 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
 }
 
 /**
- * Emails every active Manager a rollup of the most recently submitted
- * Daily Reports (system-wide, across all supervisors) as soon as a report
- * is submitted - same digest layout as the weekly report, just scoped to
- * a report count instead of a date range. Never throws - sendMail logs
- * per-recipient failures instead of blocking the submission response.
+ * Emails every active Manager a rollup of every Daily Report submitted
+ * system-wide (across all supervisors) in the trailing 24 hours, as soon
+ * as a report is submitted - same digest layout as the weekly report,
+ * just scoped to a rolling time window instead of a fixed date range.
+ * Never throws - sendMail logs per-recipient failures instead of
+ * blocking the submission response.
  */
 async function notifyManagersRecentReports(actorUserId, ip) {
   const [recentRows] = await pool.query(
-    `SELECT id FROM daily_reports WHERE status != 'draft' ORDER BY submitted_at DESC, id DESC LIMIT ?`,
-    [RECENT_REPORTS_DIGEST_COUNT]
+    `SELECT id FROM daily_reports
+     WHERE status != 'draft' AND submitted_at >= (NOW() - INTERVAL 24 HOUR)
+     ORDER BY submitted_at DESC, id DESC`
   );
   const reportIds = recentRows.map((r) => r.id);
   if (!reportIds.length) return;

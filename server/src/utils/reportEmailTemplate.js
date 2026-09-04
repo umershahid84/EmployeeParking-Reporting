@@ -413,16 +413,17 @@ function renderWeeklyReportEmailText(data, { startDate, endDate, viewUrl } = {})
 
 /**
  * Renders the digest sent to every Manager as soon as a Supervisor submits
- * a Daily Report, rolling up the most recently submitted reports
- * system-wide (across all supervisors) into the same section layout as the
- * weekly report - just scoped to a report count instead of a date range.
+ * a Daily Report, rolling up every report submitted system-wide (across
+ * all supervisors) in the trailing 24 hours into the same section layout
+ * as the weekly report - just scoped to a rolling time window instead of
+ * a fixed date range.
  */
 function renderRecentReportsEmailHtml(data, { reportCount, viewUrl, logoCid } = {}) {
-  const bodyHtml = digestSummaryRow('Reports Included', `Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`) + digestSectionsHtml(data);
+  const bodyHtml = digestSummaryRow('Reports Included', `Last 24 Hours (${reportCount} Report${reportCount === 1 ? '' : 's'})`) + digestSectionsHtml(data);
 
   return renderEmailShell({
     headerTitle: 'Employee Parking Daily Report Digest',
-    headerSubtitle: `Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    headerSubtitle: 'Reports Submitted in the Last 24 Hours',
     bodyHtml,
     viewUrl,
     viewLabel: 'Open Employee Parking Reporting',
@@ -434,7 +435,7 @@ function renderRecentReportsEmailHtml(data, { reportCount, viewUrl, logoCid } = 
 function renderRecentReportsEmailText(data, { reportCount, viewUrl } = {}) {
   return [
     'Employee Parking Daily Report Digest',
-    `Reports Included: Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    `Reports Included: Last 24 Hours (${reportCount} Report${reportCount === 1 ? '' : 's'})`,
     '',
     ...digestTextLines(data),
     `Open the application: ${viewUrl}`,

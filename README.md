@@ -372,11 +372,12 @@ in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
    to act on it in one place.
 5. **Recent reports digest** — immediately after a Supervisor submits a
    report (on initial submit, not on later edits), every **active
-   Manager** automatically receives a digest of the most recently
-   submitted Daily Reports system-wide (the last 3, across all
-   supervisors) — same rollup layout as the weekly report below (Driver
+   Manager** automatically receives a digest of every Daily Report
+   submitted system-wide (across all supervisors) in the **trailing 24
+   hours** — same rollup layout as the weekly report below (Driver
    Call-Out, Shift Coverage, Work Order Placed, and the three Shift Notes
-   categories), just scoped to a report count instead of a date range.
+   categories), just scoped to a rolling time window instead of a fixed
+   date range.
 6. **Weekly report** — on the day/time configured below, every **active
    Manager** automatically receives a digest of the prior Monday-Sunday
    week's submitted Daily Reports across **all** supervisors, rolled up
