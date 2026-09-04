@@ -7,6 +7,8 @@ const {
   renderManagerCommentEmailText,
   renderWeeklyReportEmailHtml,
   renderWeeklyReportEmailText,
+  renderRecentReportsEmailHtml,
+  renderRecentReportsEmailText,
 } = require('./reportEmailTemplate');
 const { LOGO_PATH, logoExists } = require('./logo');
 
@@ -194,11 +196,36 @@ async function sendWeeklyReportEmail({ toEmail, startDate, endDate, data }) {
   });
 }
 
+/**
+ * Sent to every active Manager as soon as a Supervisor submits a Daily
+ * Report, rolling up the most recently submitted reports system-wide
+ * (across all supervisors) into the same digest layout as the weekly
+ * report, just scoped to a report count instead of a date range.
+ */
+async function sendRecentReportsDigestEmail({ toEmail, reportCount, data }) {
+  const viewUrl = `${appUrl()}/reports`;
+  const hasLogo = logoExists();
+  const html = renderRecentReportsEmailHtml(data, { reportCount, viewUrl, logoCid: hasLogo ? LOGO_CID : null });
+  const text = renderRecentReportsEmailText(data, { reportCount, viewUrl });
+
+  await sendMail({
+    to: toEmail,
+    subject: `Daily Report Digest - Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    text,
+    html,
+    attachments: hasLogo ? [{ filename: 'port-of-seattle-logo.png', path: LOGO_PATH, cid: LOGO_CID }] : undefined,
+    emailType: 'recent_reports_digest',
+    relatedEntity: 'daily_report',
+    relatedId: null,
+  });
+}
+
 module.exports = {
   sendPasswordResetCode,
   sendAccountSetupEmail,
   sendReportSubmittedEmail,
   sendManagerCommentEmail,
   sendWeeklyReportEmail,
+  sendRecentReportsDigestEmail,
   emailEnabled,
 };

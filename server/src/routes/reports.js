@@ -3,8 +3,11 @@ const pool = require('../db/pool');
 const { requireAuth, requireRole, requireMinRole } = require('../middleware/auth');
 const { recordAudit } = require('../utils/audit');
 const { recordHistory } = require('../utils/history');
-const { sendReportSubmittedEmail, sendManagerCommentEmail } = require('../utils/email');
+const { sendReportSubmittedEmail, sendManagerCommentEmail, sendRecentReportsDigestEmail } = require('../utils/email');
 const { renderTablePdf } = require('../utils/pdfTable');
+const { buildRecentReportsDigestData } = require('../jobs/weeklyReport');
+
+const RECENT_REPORTS_DIGEST_COUNT = 3;
 
 const router = express.Router();
 
@@ -153,6 +156,13 @@ async function insertIncomingSupervisors(conn, reportId, userIds) {
   }
 }
 
+async function getActiveManagerEmails() {
+  const [rows] = await pool.query(
+    `SELECT u.email FROM users u JOIN roles r ON r.id = u.role_id WHERE r.name = 'manager' AND u.is_active = 1`
+  );
+  return rows.map((r) => r.email);
+}
+
 /**
  * Emails the submitting supervisor and every active daily-report recipient
  * (managed in the Admin Portal) that a report was submitted. Never throws -
@@ -172,28 +182,63 @@ async function notifyReportSubmitted(reportId, actorUserId, ip) {
     ...recipientRows.map((r) => r.email),
   ].filter(Boolean).map((e) => e.toLowerCase()))];
 
+  if (recipientEmails.length) {
+    for (const email of recipientEmails) {
+      await sendReportSubmittedEmail({ toEmail: email, report });
+    }
+
+    await recordAudit({
+      userId: actorUserId,
+      action: 'report_submission_email_sent',
+      entity: 'daily_report',
+      entityId: reportId,
+      details: { recipients: recipientEmails },
+      ipAddress: ip,
+    });
+  }
+
+  await notifyManagersRecentReports(actorUserId, ip);
+}
+
+/**
+ * Emails every active Manager a rollup of the most recently submitted
+ * Daily Reports (system-wide, across all supervisors) as soon as a report
+ * is submitted - same digest layout as the weekly report, just scoped to
+ * a report count instead of a date range. Never throws - sendMail logs
+ * per-recipient failures instead of blocking the submission response.
+ */
+async function notifyManagersRecentReports(actorUserId, ip) {
+  const [recentRows] = await pool.query(
+    `SELECT id FROM daily_reports WHERE status != 'draft' ORDER BY submitted_at DESC, id DESC LIMIT ?`,
+    [RECENT_REPORTS_DIGEST_COUNT]
+  );
+  const reportIds = recentRows.map((r) => r.id);
+  if (!reportIds.length) return;
+
+  const recipientEmails = [...new Set((await getActiveManagerEmails()).map((e) => e.toLowerCase()))];
   if (!recipientEmails.length) return;
 
+  const data = await buildRecentReportsDigestData(reportIds);
   for (const email of recipientEmails) {
-    await sendReportSubmittedEmail({ toEmail: email, report });
+    await sendRecentReportsDigestEmail({ toEmail: email, reportCount: reportIds.length, data });
   }
 
   await recordAudit({
     userId: actorUserId,
-    action: 'report_submission_email_sent',
+    action: 'recent_reports_digest_email_sent',
     entity: 'daily_report',
-    entityId: reportId,
-    details: { recipients: recipientEmails },
+    details: { reportIds, recipients: recipientEmails },
     ipAddress: ip,
   });
 }
 
 /**
- * Emails the submitting supervisor and every active daily-report recipient
+ * Emails the submitting supervisor, every active daily-report recipient
  * (the same distribution list used for the "report submitted" email,
- * managed in the Admin Portal) as soon as a Manager or Administrator saves
- * a comment on a report. Never throws - sendManagerCommentEmail logs
- * failures per-recipient instead of blocking the response.
+ * managed in the Admin Portal), and every active Manager as soon as a
+ * Manager or Administrator saves a comment on a report. Never throws -
+ * sendManagerCommentEmail logs failures per-recipient instead of blocking
+ * the response.
  */
 async function notifyManagerComment(reportId, commenter, comment) {
   const report = await loadReportFull(reportId);
@@ -202,11 +247,13 @@ async function notifyManagerComment(reportId, commenter, comment) {
   const [recipientRows] = await pool.query(
     `SELECT email FROM email_recipients WHERE notification_type = 'daily_report' AND is_active = 1`
   );
+  const managerEmails = await getActiveManagerEmails();
 
   const commenterEmail = (commenter.email || '').toLowerCase();
   const recipientEmails = [...new Set([
     report.supervisor_email,
     ...recipientRows.map((r) => r.email),
+    ...managerEmails,
   ].filter(Boolean).map((e) => e.toLowerCase()))].filter((e) => e !== commenterEmail);
 
   for (const email of recipientEmails) {

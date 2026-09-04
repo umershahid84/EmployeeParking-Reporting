@@ -346,7 +346,7 @@ and when.
 
 ## Email notifications
 
-The app sends five kinds of email, all through the SMTP relay configured
+The app sends six kinds of email, all through the SMTP relay configured
 in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
 `sent`/`failed`/`skipped`) as a permanent audit trail:
 
@@ -364,12 +364,20 @@ in `.env` (`EMAIL_*`), and all recorded in the `email_log` table (status
    enable/disable — entirely through the UI; nothing is hard-coded, so no
    code change or redeploy is needed to change who gets notified.
 4. **Report comment added** — as soon as a Manager or Administrator saves a
-   comment on a report, the report's submitting supervisor and every
+   comment on a report, the report's submitting supervisor, every
    **active** address in the same daily-report distribution list (Admin
-   Portal → Email Notifications) get an email with subject "Please Review
-   Manager's Note", containing the note itself plus the full report, so
-   recipients have everything they need to act on it in one place.
-5. **Weekly report** — on the day/time configured below, every **active
+   Portal → Email Notifications), and every **active Manager** get an
+   email with subject "Please Review Manager's Note", containing the note
+   itself plus the full report, so recipients have everything they need
+   to act on it in one place.
+5. **Recent reports digest** — immediately after a Supervisor submits a
+   report (on initial submit, not on later edits), every **active
+   Manager** automatically receives a digest of the most recently
+   submitted Daily Reports system-wide (the last 3, across all
+   supervisors) — same rollup layout as the weekly report below (Driver
+   Call-Out, Shift Coverage, Work Order Placed, and the three Shift Notes
+   categories), just scoped to a report count instead of a date range.
+6. **Weekly report** — on the day/time configured below, every **active
    Manager** automatically receives a digest of the prior Monday-Sunday
    week's submitted Daily Reports across **all** supervisors, rolled up
    into: Driver Call-Out, Shift Coverage, Work Order Placed, and Shift

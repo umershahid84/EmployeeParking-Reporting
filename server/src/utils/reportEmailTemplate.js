@@ -283,13 +283,28 @@ function renderManagerCommentEmailText(report, { comment, commenterName, comment
   ].join('\n');
 }
 
+/** A single label/value summary row (e.g. "Week Covered" or "Reports Included") atop a rollup digest email. */
+function digestSummaryRow(label, value) {
+  return `
+    <tr>
+      <td style="padding:24px 28px 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">${esc(label)}</td>
+            <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(value)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+}
+
 /**
- * Renders the weekly digest sent to every Manager each Monday at 04:00,
- * aggregating every supervisor's submitted Daily Reports from the prior
- * Monday-Sunday week into one set of rollup tables (as opposed to the
- * single-report layout the other templates use).
+ * The Driver Call-Out / Shift Coverage / Work Order Placed / Shift Notes
+ * rollup tables shared by every multi-report digest email (the weekly
+ * report and the report-submission digest to Managers) - as opposed to
+ * reportSectionsHtml above, which renders a single report's own sections.
  */
-function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCid } = {}) {
+function digestSectionsHtml(data) {
   const calloutRows = (data.callouts || []).map((c) => [
     esc(c.report_date),
     esc(c.shift_name),
@@ -324,17 +339,7 @@ function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCi
     nl2br(n.comments),
   ]);
 
-  const bodyHtml = `
-    <tr>
-      <td style="padding:24px 28px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td style="padding:4px 0;font:13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${MUTED};width:170px;">Week Covered</td>
-            <td style="padding:4px 0;font:600 13px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1f2933;">${esc(startDate)} to ${esc(endDate)}</td>
-          </tr>
-        </table>
-      </td>
-    </tr>
+  return `
     <tr><td style="padding:0 28px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         ${sectionTitle('Driver Call-Out')}
@@ -356,6 +361,34 @@ function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCi
         ${dataTable(['Report Date', 'Shift', 'Submitted by', 'Comments'], notesRows(data.additionalNotes))}
       </table>
     </td></tr>`;
+}
+
+/** The plain-text rollup lines shared by every multi-report digest email. */
+function digestTextLines(data) {
+  const line = (label, list, fields) => [
+    `--- ${label} ---`,
+    ...(list?.length ? list.map((r) => fields.map((f) => r[f]).filter(Boolean).join(' / ')) : ['None reported.']),
+    '',
+  ];
+
+  return [
+    ...line('Driver Call-Out', data.callouts, ['report_date', 'shift_name', 'supervisor_name', 'shuttle_number', 'driver_name', 'notes']),
+    ...line('Shift Coverage', data.coverage, ['report_date', 'shift_name', 'supervisor_name', 'coverage_type', 'original_shuttle_number', 'shuttle_number', 'notes']),
+    ...line('Work Order Placed', data.workOrders, ['report_date', 'shift_name', 'entered_by', 'location', 'comments']),
+    ...line('Shift Notes - Bus Issues', data.busIssues, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    ...line('Shift Notes - Significant Activity', data.significantActivity, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    ...line('Shift Notes - Additional Notes', data.additionalNotes, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+  ];
+}
+
+/**
+ * Renders the weekly digest sent to every Manager each Monday at 04:00,
+ * aggregating every supervisor's submitted Daily Reports from the prior
+ * Monday-Sunday week into one set of rollup tables (as opposed to the
+ * single-report layout the other templates use).
+ */
+function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCid } = {}) {
+  const bodyHtml = digestSummaryRow('Week Covered', `${startDate} to ${endDate}`) + digestSectionsHtml(data);
 
   return renderEmailShell({
     headerTitle: 'Employee Parking Weekly Report',
@@ -369,22 +402,41 @@ function renderWeeklyReportEmailHtml(data, { startDate, endDate, viewUrl, logoCi
 
 /** Plain-text fallback for the weekly digest email. */
 function renderWeeklyReportEmailText(data, { startDate, endDate, viewUrl } = {}) {
-  const line = (label, list, fields) => [
-    `--- ${label} ---`,
-    ...(list?.length ? list.map((r) => fields.map((f) => r[f]).filter(Boolean).join(' / ')) : ['None reported.']),
-    '',
-  ];
-
   return [
     'Employee Parking Weekly Report',
     `Week Covered: ${startDate} to ${endDate}`,
     '',
-    ...line('Driver Call-Out', data.callouts, ['report_date', 'shift_name', 'supervisor_name', 'shuttle_number', 'driver_name', 'notes']),
-    ...line('Shift Coverage', data.coverage, ['report_date', 'shift_name', 'supervisor_name', 'coverage_type', 'original_shuttle_number', 'shuttle_number', 'notes']),
-    ...line('Work Order Placed', data.workOrders, ['report_date', 'shift_name', 'entered_by', 'location', 'comments']),
-    ...line('Shift Notes - Bus Issues', data.busIssues, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
-    ...line('Shift Notes - Significant Activity', data.significantActivity, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
-    ...line('Shift Notes - Additional Notes', data.additionalNotes, ['report_date', 'shift_name', 'supervisor_name', 'comments']),
+    ...digestTextLines(data),
+    `Open the application: ${viewUrl}`,
+  ].join('\n');
+}
+
+/**
+ * Renders the digest sent to every Manager as soon as a Supervisor submits
+ * a Daily Report, rolling up the most recently submitted reports
+ * system-wide (across all supervisors) into the same section layout as the
+ * weekly report - just scoped to a report count instead of a date range.
+ */
+function renderRecentReportsEmailHtml(data, { reportCount, viewUrl, logoCid } = {}) {
+  const bodyHtml = digestSummaryRow('Reports Included', `Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`) + digestSectionsHtml(data);
+
+  return renderEmailShell({
+    headerTitle: 'Employee Parking Daily Report Digest',
+    headerSubtitle: `Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    bodyHtml,
+    viewUrl,
+    viewLabel: 'Open Employee Parking Reporting',
+    logoCid,
+  });
+}
+
+/** Plain-text fallback for the report-submission digest email. */
+function renderRecentReportsEmailText(data, { reportCount, viewUrl } = {}) {
+  return [
+    'Employee Parking Daily Report Digest',
+    `Reports Included: Last ${reportCount} Submitted Report${reportCount === 1 ? '' : 's'}`,
+    '',
+    ...digestTextLines(data),
     `Open the application: ${viewUrl}`,
   ].join('\n');
 }
@@ -396,4 +448,6 @@ module.exports = {
   renderManagerCommentEmailText,
   renderWeeklyReportEmailHtml,
   renderWeeklyReportEmailText,
+  renderRecentReportsEmailHtml,
+  renderRecentReportsEmailText,
 };

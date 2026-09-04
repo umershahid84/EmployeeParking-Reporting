@@ -31,12 +31,13 @@ function previousWeekRange(reference = new Date()) {
 }
 
 /**
- * Aggregates every supervisor's submitted Daily Report content (excluding
- * drafts) across the given date range into the section rollups the weekly
- * digest email needs. Mirrors the join patterns in routes/reports.js'
- * loadReportFull, but across many reports instead of one.
+ * Aggregates submitted Daily Report content (excluding drafts) matching
+ * `reportFilterSql` into the section rollups a multi-report digest email
+ * needs (weekly report, or the report-submission digest to Managers).
+ * Mirrors the join patterns in routes/reports.js' loadReportFull, but
+ * across many reports instead of one.
  */
-async function buildWeeklyReportData(startDate, endDate) {
+async function buildDigestData(reportFilterSql, params) {
   const [callouts] = await pool.query(
     `SELECT dr.report_date, s.name AS shift_name, u.name AS supervisor_name,
             sh.shuttle_number, dv.driver_name, c.notes
@@ -46,9 +47,9 @@ async function buildWeeklyReportData(startDate, endDate) {
      JOIN users u ON u.id = dr.supervisor_id
      LEFT JOIN shuttles sh ON sh.id = c.shuttle_id
      LEFT JOIN drivers dv ON dv.id = c.driver_id
-     WHERE dr.report_date BETWEEN ? AND ? AND dr.status != 'draft'
+     WHERE ${reportFilterSql}
      ORDER BY dr.report_date, s.name, c.id`,
-    [startDate, endDate]
+    params
   );
 
   const [coverage] = await pool.query(
@@ -61,9 +62,9 @@ async function buildWeeklyReportData(startDate, endDate) {
      JOIN users u ON u.id = dr.supervisor_id
      LEFT JOIN shuttles sh ON sh.id = sc.shuttle_id
      LEFT JOIN shuttles osh ON osh.id = sc.original_shuttle_id
-     WHERE dr.report_date BETWEEN ? AND ? AND dr.status != 'draft'
+     WHERE ${reportFilterSql}
      ORDER BY dr.report_date, s.name, sc.id`,
-    [startDate, endDate]
+    params
   );
 
   const [workOrders] = await pool.query(
@@ -73,9 +74,9 @@ async function buildWeeklyReportData(startDate, endDate) {
      JOIN daily_reports dr ON dr.id = wo.report_id
      JOIN shifts s ON s.id = dr.shift_id
      JOIN users u ON u.id = wo.user_id
-     WHERE dr.report_date BETWEEN ? AND ? AND dr.status != 'draft'
+     WHERE ${reportFilterSql}
      ORDER BY dr.report_date, s.name, wo.id`,
-    [startDate, endDate]
+    params
   );
 
   const [notes] = await pool.query(
@@ -84,14 +85,14 @@ async function buildWeeklyReportData(startDate, endDate) {
      FROM daily_reports dr
      JOIN shifts s ON s.id = dr.shift_id
      JOIN users u ON u.id = dr.supervisor_id
-     WHERE dr.report_date BETWEEN ? AND ? AND dr.status != 'draft'
+     WHERE ${reportFilterSql}
        AND (
          (dr.bus_issues IS NOT NULL AND dr.bus_issues != '')
          OR (dr.significant_activity IS NOT NULL AND dr.significant_activity != '')
          OR (dr.notes IS NOT NULL AND dr.notes != '')
        )
      ORDER BY dr.report_date, s.name`,
-    [startDate, endDate]
+    params
   );
 
   const pick = (field) => notes
@@ -106,6 +107,24 @@ async function buildWeeklyReportData(startDate, endDate) {
     significantActivity: pick('significant_activity'),
     additionalNotes: pick('notes'),
   };
+}
+
+/** buildDigestData scoped to a report_date range - used by the weekly report. */
+async function buildWeeklyReportData(startDate, endDate) {
+  return buildDigestData(`dr.report_date BETWEEN ? AND ? AND dr.status != 'draft'`, [startDate, endDate]);
+}
+
+/**
+ * buildDigestData scoped to a specific set of report IDs - used by the
+ * report-submission digest to Managers, which covers the N most recently
+ * submitted reports system-wide rather than a date range.
+ */
+async function buildRecentReportsDigestData(reportIds) {
+  if (!reportIds.length) {
+    return { callouts: [], coverage: [], workOrders: [], busIssues: [], significantActivity: [], additionalNotes: [] };
+  }
+  const placeholders = reportIds.map(() => '?').join(',');
+  return buildDigestData(`dr.id IN (${placeholders}) AND dr.status != 'draft'`, reportIds);
 }
 
 /**
@@ -166,6 +185,7 @@ async function applyWeeklyReportSchedule() {
 module.exports = {
   previousWeekRange,
   buildWeeklyReportData,
+  buildRecentReportsDigestData,
   sendWeeklyReportEmails,
   applyWeeklyReportSchedule,
 };
